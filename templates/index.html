@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Kids Graça — Match Analyzer{% endblock %}
+
+{% block content %}
+<div style="max-width: 480px; margin: 80px auto;">
+
+  <div style="text-align: center; margin-bottom: 48px;">
+    <div style="font-size: 36px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 8px;">
+      Kids<span style="color: var(--blue);">Graça</span>
+    </div>
+    <p style="color: var(--muted); font-size: 14px;">Match analysis for League of Legends</p>
+  </div>
+
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+
+  <div class="card" style="margin-bottom: 16px;">
+    <div class="section-title">Search summoner</div>
+    <form method="POST">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <div style="flex: 1;">
+          <label class="field-label">Name</label>
+          <input type="text" name="summoner_name" placeholder="Faker" autocomplete="off" autofocus>
+        </div>
+        <div style="width: 110px;">
+          <label class="field-label">Tag</label>
+          <input type="text" name="tagline" placeholder="KR1" autocomplete="off">
+        </div>
+      </div>
+        <label class="field-label">Region</label>
+        <select name="region">
+          {% for r in regions %}<option>{{ r }}</option>{% endfor %}</select>
+        <button type="submit" class="btn btn-primary" style="width: 66%;margin-left: 10px; justify-content: center;">Search</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

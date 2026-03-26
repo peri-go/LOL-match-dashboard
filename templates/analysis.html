@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}Analysis — {{ match_id }}{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-row">
+    <div>
+      <div class="page-eyebrow">Match Analysis</div>
+      <div class="page-title mono" style="font-size: 15px; color: var(--muted);">{{ match_id }}</div>
+    </div>
+    <div class="page-actions">
+      {% if summoner %}<a href="/history" class="btn btn-ghost btn-sm">History</a>{% endif %}
+      <a href="/" class="btn btn-ghost btn-sm">Home</a>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('scoreboard', this)">Scoreboard</button>
+  <button class="tab-btn" onclick="switchTab('charts', this)">Charts</button>
+  <button class="tab-btn" onclick="switchTab('timeline', this)">Timeline</button>
+</div>
+
+<!-- ── SCOREBOARD ─────────────────────────────────────────────────────────── -->
+<div id="tab-scoreboard" class="tab-panel active">
+
+  {% for team_key, team_label, team_cls in [('blue', 'Blue Team', 'team-blue'), ('red', 'Red Team', 'team-red')] %}
+  <div style="margin-bottom: 20px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border);">
+    <div class="team-header {{ team_cls }}">
+      <span>&#9632;</span> {{ team_label }}
+      {% if scoreboard[team_key] %}
+        {% if scoreboard[team_key][0].win %}
+          <span class="badge badge-win" style="margin-left: auto;">Victory</span>
+        {% else %}
+          <span class="badge badge-loss" style="margin-left: auto;">Defeat</span>
+        {% endif %}
+      {% endif %}
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Summoner</th><th>Champion</th><th>K / D / A</th>
+          <th>KDA</th><th>Damage</th><th>Gold</th><th>CS</th><th>Vision</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in scoreboard[team_key] %}
+        <tr {% if summoner and p.summoner_name == summoner %}class="is-summoner"{% endif %}>
+          <td style="font-weight: 500;">
+            {{ p.summoner_name }}
+            {% if summoner and p.summoner_name == summoner %}
+              <span class="badge badge-blue" style="margin-left: 6px;">You</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="champ-cell">
+              <img src="{{ p.champ_icon }}" alt="{{ p.champion }}" class="champ-icon" onerror="this.style.display='none'">
+              <span>{{ p.champion }}</span>
+            </div>
+          </td>
+          <td class="kda">
+            <span class="kda-k">{{ p.kills }}</span><span style="color:var(--muted2);"> / </span><span class="kda-d">{{ p.deaths }}</span><span style="color:var(--muted2);"> / </span><span class="kda-a">{{ p.assists }}</span>
+          </td>
+          <td class="mono" style="color: {% if p.kda >= 3 %}var(--win){% elif p.kda >= 1.5 %}var(--text){% else %}var(--loss){% endif %};">{{ p.kda }}</td>
+          <td class="mono">{{ '{:,}'.format(p.dmg_to_champions) }}</td>
+          <td class="mono">{{ '{:,}'.format(p.gold_earned) }}</td>
+          <td class="mono">{{ p.cs }}</td>
+          <td class="mono">{{ p.vision_score }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- ── CHARTS ─────────────────────────────────────────────────────────────── -->
+<div id="tab-charts" class="tab-panel">
+  <div class="checkbox-wrapper-2" style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px;">
+    <input type="checkbox" id="togglename" class="sc-gJwTLC ikxBAC">
+    <label for="togglename" style="color: var(--muted); font-size: 13px; cursor: pointer;">Show champion names</label>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px;">
+    <div class="card"><div class="section-title">Damage dealt</div><canvas id="damageChart"></canvas></div>
+    <div class="card"><div class="section-title">Gold earned</div><canvas id="goldChart"></canvas></div>
+    <div class="card"><div class="section-title">CS</div><canvas id="csChart"></canvas></div>
+    <div class="card"><div class="section-title">KDA ratio</div><canvas id="kdaChart"></canvas></div>
+    <div class="card"><div class="section-title">Vision score</div><canvas id="visionChart"></canvas></div>
+  </div>
+</div>
+
+<!-- ── TIMELINE ───────────────────────────────────────────────────────────── -->
+<div id="tab-timeline" class="tab-panel">
+  <div class="card" style="margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <div class="section-title" style="margin-bottom: 0;">Minute</div>
+      <span id="minute-label" style="font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--blue);">0</span>
+    </div>
+    <input type="range" id="timeline-slider" min="0" value="0">
+    <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted2); font-family: var(--mono);">
+      <span id="tl-min-label">0</span>
+      <span id="tl-max-label">0</span>
+    </div>
+  </div>
+  <div id="timeline-events" style="display: flex; flex-direction: column; gap: 4px; max-height: 520px; overflow-y: auto;"></div>
+</div>
+
+<script>
+  const chartsData   = {{ charts|safe }};
+  const timelineData = {{ timeline|safe }};
+  const summoner     = "{{ summoner or '' }}";
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    btn.classList.add('active');
+    if (name === 'charts') Object.values(charts).forEach(c => c.resize());
+  }
+
+  function teamColors(teams) {
+    return teams.map(t => t === 100 ? 'rgba(83,131,232,0.75)' : 'rgba(232,64,87,0.75)');
+  }
+
+  function makeBarChart(id, data) {
+    return new Chart(document.getElementById(id), {
+      type: 'bar',
+      data: {
+        labels: data.labels,
+        datasets: [{ data: data.values, backgroundColor: teamColors(data.teams), borderRadius: 4, borderSkipped: false }]
+      },
+      options: {
+        indexAxis: 'y', responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { backgroundColor: '#1c1c2e', borderColor: '#2e2e48', borderWidth: 1, titleColor: '#e2e2f0', bodyColor: '#7878a8', padding: 10 }
+        },
+        scales: {
+          x: { beginAtZero: true, grid: { color: 'rgba(46,46,72,0.6)' }, ticks: { color: '#7878a8', font: { family: "'Sora', sans-serif", size: 12 } } },
+          y: { grid: { display: false }, ticks: { color: '#e2e2f0', font: { family: "'Sora', sans-serif", size: 12 } } }
+        }
+      }
+    });
+  }
+
+  const charts = {
+    damage: makeBarChart('damageChart', chartsData.damage),
+    gold:   makeBarChart('goldChart',   chartsData.gold),
+    cs:     makeBarChart('csChart',     chartsData.cs),
+    kda:    makeBarChart('kdaChart',    chartsData.kda),
+    vision: makeBarChart('visionChart', chartsData.vision),
+  };
+
+  document.getElementById('togglename').addEventListener('change', function() {
+    const useChamp = this.checked;
+    Object.keys(charts).forEach(key => {
+      const raw = chartsData[key];
+      charts[key].data.labels = useChamp ? raw.champions : raw.labels;
+      charts[key].update();
+    });
+  });
+
+  const slider      = document.getElementById('timeline-slider');
+  const minuteLabel = document.getElementById('minute-label');
+  const eventsDiv   = document.getElementById('timeline-events');
+  const minutes     = timelineData.minutes;
+
+  if (minutes.length > 0) {
+    slider.min = minutes[0];
+    slider.max = minutes[minutes.length - 1];
+    slider.value = minutes[0];
+    document.getElementById('tl-min-label').textContent = minutes[0] + 'm';
+    document.getElementById('tl-max-label').textContent = minutes[minutes.length - 1] + 'm';
+    renderEvents(minutes[0]);
+  }
+
+  slider.addEventListener('input', () => {
+    const min = parseInt(slider.value);
+    minuteLabel.textContent = min;
+    renderEvents(min);
+  });
+
+  function tc(team_id) { return team_id === 100 ? 'var(--blue)' : 'var(--loss)'; }
+  function champ(name, team_id) { return `<span style="color:${tc(team_id)};font-weight:500;">${name}</span>`; }
+  function itemImg(url, id) { return url ? `<img src="${url}" alt="item ${id}" class="item-icon" onerror="this.style.display='none'">` : ''; }
+
+  function renderEvents(minute) {
+    const events = timelineData.events[minute] || [];
+    if (!events.length) {
+      eventsDiv.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">No events at minute ${minute}</div>`;
+      return;
+    }
+    eventsDiv.innerHTML = events.map(e => {
+      let cls = '', icon = '', text = '';
+      if (e.type === 'CHAMPION_KILL') {
+        cls = 'kill'; icon = '⚔';
+        text = `${champ(e.killer_champ, e.killer_team)} killed ${champ(e.victim_champ, e.victim_team)}`;
+      } else if (e.type === 'BUILDING_KILL') {
+        cls = 'build'; icon = '🏰';
+        text = `${champ(e.killer_champ, e.killer_team)} destroyed ${(e.building_type||'').replace(/_/g,' ').toLowerCase() || 'a structure'}`;
+      } else if (e.type === 'ELITE_MONSTER_KILL') {
+        cls = 'obj'; icon = '🐉';
+        text = `${champ(e.killer_champ, e.killer_team)} slew ${(e.monster_type||'').replace(/_/g,' ').toLowerCase() || 'a monster'}`;
+      } else if (e.type === 'ITEM_PURCHASED') {
+        cls = 'item';
+        text = `${champ(e.killer_champ, e.killer_team)} purchased ${itemImg(e.item_url, e.item_id)}`;
+      }
+      return `<div class="tl-event ${cls}">
+        <span class="tl-time">${minute}m</span>
+        ${icon ? `<span style="font-size:14px;">${icon}</span>` : ''}
+        <span>${text}</span>
+      </div>`;
+    }).join('');
+  }
+</script>
+{% endblock %}
