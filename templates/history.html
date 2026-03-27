@@ -50,6 +50,9 @@
       <tr>
         <th>Result</th>
         <th>Champion</th>
+        <th>Spells</th>
+        <th>Runes</th>
+        <th>Build</th>
         <th>K / D / A</th>
         <th>KDA</th>
         <th>CS</th>
@@ -66,10 +69,27 @@
         <td><span class="badge {{ 'badge-win' if m.win else 'badge-loss' }}">{{ 'Win' if m.win else 'Loss' }}</span></td>
         <td>
           <div class="champ-cell">
-            <img src="https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/{{ m.champion }}.png"
-                 alt="{{ m.champion }}" class="champ-icon"
-                 onerror="this.style.display='none'">
-            <span style="font-weight: 500;">{{ m.champion }}</span>
+            <div style="position: relative; width: 28px; height: 28px; flex-shrink: 0;">
+  <img src="https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/{{ m.champion }}.png" class="champ-icon" onerror="this.style.display='none'">
+  <span style="position: absolute; bottom: -10px; right: -9px; font-size: 9px; font-weight: 600;
+               background: var(--bg); color: var(--text); line-height: 1;
+               padding: 1px 3px; border-radius: 3px;">{{ m.level }}</span>
+</div>
+            <span style="font-weight: 500; margin-left: 8px; position: relative; top: 5px;">{{ m.champion }}</span>
+          </div>
+          <td></td>
+        </td>
+        <td><img src="{{ m.keystone }}" class="rune-key"><img src="{{ m.secondary }}" class="rune-sec"></td>
+        <td><div style="display: grid; grid-template-columns: repeat(3, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
+            {% for item in m.item %}
+              {% if item %}
+                <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ item }}.png"
+                    style="width: 24px; height: 24px; border-radius: 3px;"
+                    onerror="this.style.display='none'">
+              {% else %}
+                <div style="width: 24px; height: 24px; background: var(--bg); border-radius: 3px;"></div>
+              {% endif %}
+            {% endfor %}
           </div>
         </td>
         <td class="kda">
@@ -79,7 +99,7 @@
         <td class="mono">{{ m.cs }}</td>
         <td class="mono">{{ '{:,}'.format(m.damage) }}</td>
         <td style="color: var(--muted);">{{ m.queue }}</td>
-        <td class="mono" style="color: var(--muted);">{{ m.duration_min }}m</td>
+        <td class="mono" style="color: var(--muted);">{{ m.duration_m }}m {{ m.duration_s }}s</td>
         <td style="color: var(--muted2); font-size: 12px;">{{ m.patch }}</td>
         <td><a href="/select_match/{{ m.match_id }}" class="btn btn-ghost btn-sm">Analyze</a></td>
       </tr>

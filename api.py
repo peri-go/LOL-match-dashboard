@@ -3,6 +3,7 @@ import json
 import time
 import requests
 import pandas as pd
+import analysis
 from config import API_KEY,MAX_MATCHES
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
@@ -89,7 +90,7 @@ def get_puuid(name, tagline=''):
 
 # ── match list ────────────────────────────────────────────────────────────────
 
-def get_match_history(puuid, region=None):
+def get_match_history(puuid, runes, region=None):
     region    = (region).upper()
     continent = CONTINENTAL.get(region, 'americas')
 
@@ -113,9 +114,15 @@ def get_match_history(puuid, region=None):
         if not me:
             continue
 
+        perks      = me.get("perks", {})
+        styles     = perks.get("styles", [])
+        pri        = styles[0] if styles else {}
+        sub        = styles[1] if len(styles) > 1 else {}
+        pri_sel    = pri.get("selections", [{}])
         dur = max(info.get('gameDuration', 1), 1)
         kda = (me['kills'] + me['assists']) / max(me['deaths'], 1)
-
+        keystone = pri_sel[0].get("perk") if pri_sel else None,
+        secondary = sub.get("style")
         rows.append({
             'match_id':     mid,
             'champion':     me.get('championName', '?'),
@@ -128,11 +135,15 @@ def get_match_history(puuid, region=None):
             'kda':          round(kda, 2),
             'damage':       me.get('totalDamageDealtToChampions', 0),
             'cs':           me.get('totalMinionsKilled', 0),
-            'duration_min': round(dur / 60, 1),
+            'duration_m':   dur // 60,
+            'duration_s':   dur % 60,
             'patch':        info.get('gameVersion', '').rsplit('.', 1)[0],
+            'level': me.get('champLevel', 0),
+            'keystone':     runes[keystone[0]],
+            'secondary':    runes[secondary],
+            "item": [me.get(f"item{i}") for i in range(6)]
         })
         time.sleep(0.05)
-
     return rows
 
 # ── full match fetch + CSV build ──────────────────────────────────────────────
@@ -166,6 +177,11 @@ def build_all_players_csv(match_id, region=None):
     participants = match['info']['participants']
     rows = []
     for p in participants:
+        perks      = p.get("perks", {})
+        styles     = perks.get("styles", [])
+        pri        = styles[0] if styles else {}
+        sub        = styles[1] if len(styles) > 1 else {}
+        pri_sel    = pri.get("selections", [{}])
         rows.append({
             # identity
             "match_id":                  match_id,
@@ -205,6 +221,16 @@ def build_all_players_csv(match_id, region=None):
             "first_blood_assist":        p.get("firstBloodAssist"),
             "first_tower_kill":          p.get("firstTowerKill"),
             "first_tower_assist":        p.get("firstTowerAssist"),
+            # runes
+            "rune_primary_style":        pri.get("style"),
+            "rune_sub_style":            sub.get("style"),
+            "rune_keystone":             pri_sel[0].get("perk") if pri_sel else None,
+            "rune_primary_slot1":        pri_sel[1].get("perk") if len(pri_sel) > 1 else None,
+            "rune_primary_slot2":        pri_sel[2].get("perk") if len(pri_sel) > 2 else None,
+            "rune_primary_slot3":        pri_sel[3].get("perk") if len(pri_sel) > 3 else None,
+            "rune_stat_defense":         perks.get("statPerks", {}).get("defense"),
+            "rune_stat_flex":            perks.get("statPerks", {}).get("flex"),
+            "rune_stat_offense":         perks.get("statPerks", {}).get("offense"),
             # damage dealt
             "dmg_to_champions":          p.get("totalDamageDealtToChampions"),
             "dmg_physical_champ":        p.get("physicalDamageDealtToChampions"),

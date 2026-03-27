@@ -10,7 +10,7 @@ app.secret_key = 'lol-analyzer-secret'
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
-
+runes = analysis.get_rune_paths()
 # ── Page 1: landing ──────────────────────────────────────────────────────────
 
 @app.route('/', methods=['GET', 'POST'])
@@ -44,7 +44,7 @@ def match_history():
 
     region = session.get('region', 'BR')
     try:
-        history = api.get_match_history(puuid, region)
+        history = api.get_match_history(puuid, runes, region)
     except Exception as e:
         return render_template('history.html', error=str(e), history=[], summoner=summoner_name)
 

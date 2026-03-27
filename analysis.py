@@ -23,6 +23,21 @@ def champ_icon_url(champ_name):
     name = (champ_name or 'Ahri').replace(' ', '').replace("'", '').replace('.', '')
     return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/champion/{name}.png'
 
+def get_rune_paths():
+    try: 
+        r = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/runesReforged.json', timeout=5)
+        runes = r.json()
+        base = "https://ddragon.leagueoflegends.com/cdn/img/"
+        rune_icons = {}
+        for tree in runes:
+            rune_icons[tree['id']] = base + tree['icon']
+            for slot in tree["slots"]:
+                for rune in slot["runes"]:
+                    rune_icons[rune['id']] = base + rune['icon']
+        return rune_icons
+    except:
+        return None
+    
 def load_csvs(all_players_path, timeline_path):
     df_players  = pd.read_csv(all_players_path)
     df_timeline = pd.read_csv(timeline_path)
