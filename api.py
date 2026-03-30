@@ -161,6 +161,8 @@ def get_match_history(puuid, runes, region=None):
             'secondary':    runes[secondary],
             "item": [me.get(f"item{i}") for i in range(6)],
         })
+        rows[-1]['item'].insert(3,me.get(f"item6"))
+        rows[-1]['item'].append(me.get("roleBoundItem"))
         time.sleep(0.05)
     return rows
 
@@ -339,6 +341,7 @@ def build_all_players_csv(match_id, region=None):
             "item2": p.get("item2"), "item3": p.get("item3"),
             "item4": p.get("item4"), "item5": p.get("item5"),
             "item6": p.get("item6"),
+            "mission": p.get("roleBoundItem"),
             # time stats
             "time_spent_dead":           p.get("totalTimeSpentDead"),
             "longest_time_alive":        p.get("longestTimeSpentLiving"),

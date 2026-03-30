@@ -137,8 +137,8 @@
           <td class="mono"><div>{{ '{:,}'.format(p.gold_earned) }}</div><div style="color: var(--muted);font-size: 11px;">{{ (p.gold_earned/match.meta.duration_min)|round|int }}/min</div></td>
           <td class="mono"><div>{{ p.cs }}</div><div style="color: var(--muted);font-size: 11px;">{{ "%.3g"|format(p.cs/match.meta.duration_min) }}/min</div></td>
           <td class="mono"><div>{{ p.vision_score }}</div><div style="color: var(--muted);font-size: 11px;">{{p.wards_placed}}/{{p.wards_killed}}</div></td>
-          <td class="mono" style="width: 80px; padding: 6px 8px;"><div style="display: grid; grid-template-columns: repeat(6, 32px); gap: 2px;">
-    {% for i in range(6) %}
+          <td class="mono" style="width: 80px; padding: 6px 8px;"><div style="display: grid; grid-template-columns: repeat(8, 32px); gap: 2px;">
+    {% for i in range(7) %}
       {% set item_id = p['item' ~ i] %}
       {% if item_id and item_id != 0 %}
         <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ item_id }}.png"
@@ -148,6 +148,14 @@
         <div style="width: 32px; height: 32px; background: var(--bg); border-radius: 3px;"></div>
       {% endif %}
     {% endfor %}
+
+    {% if p.mission %}
+    <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ p.mission }}.png"
+             style="width: 32px; height: 32px; border-radius: 3px;"
+             onerror="this.style.display='none'">
+    {% else %}
+    <div style="width: 32px; height: 32px; background: var(--bg); border-radius: 3px;"></div>
+    {% endif %}
   </div></td>
         </tr>
         {% endfor %}

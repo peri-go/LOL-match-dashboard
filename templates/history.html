@@ -79,7 +79,7 @@
           <td style="width: 100px;"><img src="{{m.spell_1}}" class="spell"><img src="{{m.spell_2}}" class="spell"></td>
         </td>
         <td><img src="{{ m.keystone }}" class="rune-key"><img src="{{ m.secondary }}" class="rune-sec"></td>
-        <td><div style="display: grid; grid-template-columns: repeat(3, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
+        <td><div style="display: grid; grid-template-columns: repeat(4, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
             {% for item in m.item %}
               {% if item %}
                 <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ item }}.png"
@@ -90,6 +90,7 @@
               {% endif %}
             {% endfor %}
           </div>
+          
         </td>
         <td class="kda">
           <span class="kda-k">{{ m.kills }}</span><span style="color:var(--muted2);"> / </span><span class="kda-d">{{ m.deaths }}</span><span style="color:var(--muted2);"> / </span><span class="kda-a">{{ m.assists }}</span>
