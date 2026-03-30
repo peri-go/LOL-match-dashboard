@@ -53,9 +53,10 @@ def match_history():
 @app.route('/select_match/<match_id>')
 def select_match(match_id):
     try:
-        all_players_path = api.build_all_players_csv(match_id,session['region'])
+        all_players_path,match = api.build_all_players_csv(match_id,session['region'])
         timeline_path = api.build_timeline_csv(match_id,session['region'])
         session['all_players_path'] = all_players_path
+        session['match'] = match
         session['timeline_path'] = timeline_path
         session['match_id'] = match_id
         return redirect(url_for('analysis_page'))
@@ -66,12 +67,10 @@ def select_match(match_id):
 
 @app.route('/analysis')
 def analysis_page():
-
     all_players_path = session.get('all_players_path')
     timeline_path = session.get('timeline_path')
     summoner_name = session.get('summoner_name')
-    match_id = session.get('match_id', '')
-
+    match = session.get('match')
     if not all_players_path or not timeline_path:
         return redirect(url_for('index'))
 
@@ -79,14 +78,13 @@ def analysis_page():
         data = analysis.build_analysis(all_players_path, timeline_path, summoner_name)
     except Exception as e:
         return f'Error building analysis: {e}', 500
-
     return render_template('analysis.html',
         scoreboard=data['scoreboard'],
         player_stats=data['player_stats'],
         charts=json.dumps(data['charts']),
         timeline=json.dumps(data['timeline']),
         summoner=summoner_name,
-    )
+        match= match)
 
 if __name__ == '__main__':
     app.run(debug=True)

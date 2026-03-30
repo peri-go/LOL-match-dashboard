@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Analysis — {{ match_id }}{% endblock %}
+{% block title %}Analysis{% endblock %}
 
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -29,8 +29,61 @@
 <!-- ── SCOREBOARD ─────────────────────────────────────────────────────────── -->
 <div id="tab-scoreboard" class="tab-panel active">
 
+<div class="team-headers" style="margin-top:.5rem;justify-content: center;">
+    {% for tlabel in ["blue","red"] %}
+    {% set t = match.team_stats[tlabel] %}
+    <div class="team-box {{ tlabel }}">
+      <div class="flex flex-center gap-sm" style="margin-bottom:.5rem">
+        <span class="badge {{ 'badge-win' if t.win else 'badge-loss' }}">
+          {{ 'VICTORY' if t.win else 'DEFEAT' }}
+        </span>
+        <span class="badge {{ 'badge-blue' if tlabel=='blue' else 'badge-loss' }}" style="float: right;">
+          {{ tlabel.upper() }}
+        </span>
+      </div>
+      <div class="team-kda">
+        {{ t.kills }}
+        <span>/</span>
+        {{ t.deaths }}
+        <span>/</span>
+        {{ t.assists }}</div>
+      <div class="obj-row">
+       <span class="obj" style="font-size: 15px;">Gold<span style="margin-left: 10px;">{{ "{:,}".format(t.gold) }}</span></span>
+        <span class="obj">
+          <svg width="20" height="20" viewBox="0 0 16 16" class="text-red-500"><path fill="currentColor" fill-rule="nonzero" d="M9 10a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7 8a1 1 0 1 1 2 0 1 1 0 0 1-2 0m0 4a1 1 0 1 1 2 0 1 1 0 0 1-2 0m-2-2a1 1 0 1 1 2 0 1 1 0 0 1-2 0m5-10 2 4-1 1H9L8 4 7 5H5L4 4l2-4-6 4 2 4 3 8 1-1h4l1 1 3-8 2-4z"></path></svg><span>{{ t.barons }}</span></span>
+        <span class="obj">
+          <svg width="20" height="20" fill="none" viewBox="0 0 16 16" class="text-red-500"><path fill="currentColor" fill-rule="evenodd" d="M8 0 6 4 3 1v4H0l3 3v3l4 5h2l4-5V8l3-3h-3V1l-3 3zm1 11 1-2 2-1-1 2zM4 8l1 2 2 1-1-2z" clip-rule="evenodd"></path><mask id="mask0_5762_288546" width="16" height="16" x="0" y="0" maskUnits="userSpaceOnUse" style="mask-type: luminance;"><path fill="#fff" fill-rule="evenodd" d="M8 0 6 4 3 1v4H0l3 3v3l4 5h2l4-5V8l3-3h-3V1l-3 3zm1 11 1-2 2-1-1 2zM4 8l1 2 2 1-1-2z" clip-rule="evenodd"></path></mask></svg><span>{{ t.dragons }}</span></span>
+        <span class="obj"><svg width="20" height="20" viewBox="0 0 16 16" class="text-red-500"><path fill="currentColor" fill-rule="nonzero" d="m12 8-2 8H6L4 8l4 4zM8 0l4 4-1.003 1.002L11 5h3l-6 6-6-6h2.999L4 4zm0 2.4L6.4 4 8 5.6 9.6 4z"></path></svg><span>{{ t.towers }}</span></span>
+        <span class="obj"><svg width="20" height="20" fill="none" viewBox="0 0 16 16" class="text-main-500"><path fill="currentColor" fill-rule="evenodd" d="M8 1 6.333 2.42s-.87.798-1.151.798H3.928c-.928 0-2.261.978-2.557 2.68-.074.429-.098 1.282.56 2.168L1 8.812s1.333.71 1.667 2.131C3 12.363 5.088 13.704 6.9 14.088l1.08.881V15L8 14.985l.019.015v-.031l1.08-.881c1.813-.384 3.901-1.724 4.234-3.145.334-1.42 1.667-2.13 1.667-2.13l-.931-.747c.658-.886.637-1.726.56-2.169-.296-1.701-1.629-2.68-2.557-2.68h-1.254c-.28 0-1.151-.797-1.151-.797zm.149 3.245a.2.2 0 0 0-.298 0L5.434 6.93a.2.2 0 0 0 .021.29c.275.228.818.687 1.007.914.21.255-1.316 1.405-1.862 1.804a.202.202 0 0 0-.026.304l1.84 1.88a.2.2 0 0 0 .285 0l1.158-1.183a.2.2 0 0 1 .286 0L9.3 12.122a.2.2 0 0 0 .286 0l1.84-1.88a.202.202 0 0 0-.026-.304c-.546-.399-2.073-1.549-1.862-1.804.189-.227.732-.686 1.007-.913a.2.2 0 0 0 .021-.29z" clip-rule="evenodd"></path></svg><span>{{ t.voidgrubs }}</span></span>
+        <span class="obj"><svg width="20" height="20" fill="none" viewBox="0 0 16 16" class="text-main-500"><path fill="currentColor" fill-rule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14m0-1A6 6 0 1 0 8 2a6 6 0 0 0 0 12" clip-rule="evenodd"></path><path fill="currentColor" d="m8 4 4 4-4 4-4-4z"></path></svg><span>{{ t.inhibitors }}</span></span>
+        
+      
+      {% if t.bans %}
+      <div>
+      <div class="text-muted" style="font-size:10px;margin-top:.4rem">
+        Bans: 
+      {% endif %}
+      </div>
+      {% for ban in t.bans%}
+        {% if ban%}
+        <img src="{{ ban }}" class="ban_icon">
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    </div>
+    {% if loop.first %}
+    <div style="text-align:center;margin:40px">
+      <div class="text-muted" style="font-size:10px;letter-spacing:1px">DURATION</div>
+      <div style="font-size:1.4rem;font-weight:700">{{ match.meta.duration_str }}</div>
+      <div class="text-muted" style="font-size:11px">{{ match.meta.queue }} · {{ match.meta.patch }}</div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
   {% for team_key, team_label, team_cls in [('blue', 'Blue Team', 'team-blue'), ('red', 'Red Team', 'team-red')] %}
-  <div style="margin-bottom: 20px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border);">
+  <div style="border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border);">
     <div class="team-header {{ team_cls }}">
       <span>&#9632;</span> {{ team_label }}
       {% if scoreboard[team_key] %}
@@ -41,36 +94,61 @@
         {% endif %}
       {% endif %}
     </div>
-    <table>
+    <table style="background: var(--surface)">
       <thead>
         <tr>
-          <th>Summoner</th><th>Champion</th><th>K / D / A</th>
-          <th>KDA</th><th>Damage</th><th>Gold</th><th>CS</th><th>Vision</th>
+          <th>Champion</span></th><th>K / D / A</th>
+          <th>Damage</th><th>Gold</th><th>CS</th><th>Vision</th><th style="width: 80px;">Items</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody >
+        
         {% for p in scoreboard[team_key] %}
-        <tr {% if summoner and p.summoner_name == summoner %}class="is-summoner"{% endif %}>
-          <td style="font-weight: 500;">
-            {{ p.summoner_name }}
-            {% if summoner and p.summoner_name == summoner %}
-              <span class="badge badge-blue" style="margin-left: 6px;">You</span>
-            {% endif %}
-          </td>
-          <td>
+        <tr {% if p.summoner_name == summoner.split('#')[0] %}class="is-summoner"{% endif %}>
+          <td style="max-width: 150px;">
             <div class="champ-cell">
-              <img src="{{ p.champ_icon }}" alt="{{ p.champion }}" class="champ-icon" onerror="this.style.display='none'">
-              <span>{{ p.champion }}</span>
-            </div>
+            <div style="position: relative; bottom: 5px;width: 28px; height: 28px; flex-shrink: 0;">
+  <img src="{{p.champion_icon }}" class="champ-icon" onerror="this.style.display='none'">
+  <span style="position: absolute; bottom: -10px; right: -9px; font-size: 9px; font-weight: 600;
+               background: var(--bg); color: var(--text); line-height: 1;
+               padding: 1px 3px; border-radius: 3px;">{{ p.champion_level }}</span>
+</div>
+            <div style="font-weight:600;font-size:12px;margin-left: 14px">{{ p.champion_name }} <div style="font-size:10px;color: var(--muted)">
+                  {{ p.summoner_name }}#{{ p.tagline }}{% if p.position %} · {% if p.position == 'UTILITY'%} SUPPORT {% else %}{{ p.position }}{% endif %}{% endif %}
+                </div></div>
+                {% if p.summoner_name == summoner.split('#')[0] %}<span class="badge badge-gold" style="font-size:9px">YOU</span>{% endif %}
+          </div>
           </td>
-          <td class="kda">
-            <span class="kda-k">{{ p.kills }}</span><span style="color:var(--muted2);"> / </span><span class="kda-d">{{ p.deaths }}</span><span style="color:var(--muted2);"> / </span><span class="kda-a">{{ p.assists }}</span>
+          <td class="mono">
+            <div style="margin-left: 20px; color: {% if p.kda >= 3 %}var(--win){% elif p.kda >= 1.5 %}var(--text){% else %}var(--loss){% endif %};">{{ p.kda }}</div>
+
+            <span>{{ p.kills }}</span><span style="color:var(--muted2);"> / </span><span>{{ p.deaths }}</span><span style="color:var(--muted2);"> / </span><span>{{ p.assists }}</span>
           </td>
-          <td class="mono" style="color: {% if p.kda >= 3 %}var(--win){% elif p.kda >= 1.5 %}var(--text){% else %}var(--loss){% endif %};">{{ p.kda }}</td>
-          <td class="mono">{{ '{:,}'.format(p.dmg_to_champions) }}</td>
-          <td class="mono">{{ '{:,}'.format(p.gold_earned) }}</td>
-          <td class="mono">{{ p.cs }}</td>
-          <td class="mono">{{ p.vision_score }}</td>
+          <td style="max-width: 50px;">
+  <div style="font-size: 12px; font-family: var(--mono); margin-bottom: 4px;">
+    {{ '{:,}'.format(p.dmg_to_champions) }}
+  </div>
+  <div style="height: 4px; background: var(--bg); border-radius: 2px; width: 100px;">
+    <div style="height: 4px; border-radius: 2px; background: {{ 'var(--blue)' if p.team_id == 100 else 'var(--loss)' }};
+                width: {{ ((p.dmg_to_champions / p.max_damage) * 100) | round | int }}%;"></div>
+  </div>
+</td>
+          
+          <td class="mono"><div>{{ '{:,}'.format(p.gold_earned) }}</div><div style="color: var(--muted);font-size: 11px;">{{ (p.gold_earned/match.meta.duration_min)|round|int }}/min</div></td>
+          <td class="mono"><div>{{ p.cs }}</div><div style="color: var(--muted);font-size: 11px;">{{ "%.3g"|format(p.cs/match.meta.duration_min) }}/min</div></td>
+          <td class="mono"><div>{{ p.vision_score }}</div><div style="color: var(--muted);font-size: 11px;">{{p.wards_placed}}/{{p.wards_killed}}</div></td>
+          <td class="mono" style="width: 80px; padding: 6px 8px;"><div style="display: grid; grid-template-columns: repeat(6, 32px); gap: 2px;">
+    {% for i in range(6) %}
+      {% set item_id = p['item' ~ i] %}
+      {% if item_id and item_id != 0 %}
+        <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ item_id }}.png"
+             style="width: 32px; height: 32px; border-radius: 3px;"
+             onerror="this.style.display='none'">
+      {% else %}
+        <div style="width: 32px; height: 32px; background: var(--bg); border-radius: 3px;"></div>
+      {% endif %}
+    {% endfor %}
+  </div></td>
         </tr>
         {% endfor %}
       </tbody>
@@ -124,16 +202,21 @@
     if (name === 'charts') Object.values(charts).forEach(c => c.resize());
   }
 
-  function teamColors(teams) {
-    return teams.map(t => t === 100 ? 'rgba(83,131,232,0.75)' : 'rgba(232,64,87,0.75)');
-  }
+  function teamColors(teams, labels) {
+  const summonerBase = summoner.split('#')[0];
+  return teams.map((t, i) =>
+    labels[i] === summonerBase
+      ? 'rgba(200,155,60,0.85)'
+      : t === 100 ? 'rgba(83,131,232,0.75)' : 'rgba(232,64,87,0.75)'
+  );
+}
 
   function makeBarChart(id, data) {
-    return new Chart(document.getElementById(id), {
-      type: 'bar',
-      data: {
-        labels: data.labels,
-        datasets: [{ data: data.values, backgroundColor: teamColors(data.teams), borderRadius: 4, borderSkipped: false }]
+  return new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [{ data: data.values, backgroundColor: teamColors(data.teams, data.labels), borderRadius: 4, borderSkipped: false }]
       },
       options: {
         indexAxis: 'y', responsive: true,
@@ -158,13 +241,14 @@
   };
 
   document.getElementById('togglename').addEventListener('change', function() {
-    const useChamp = this.checked;
-    Object.keys(charts).forEach(key => {
-      const raw = chartsData[key];
-      charts[key].data.labels = useChamp ? raw.champions : raw.labels;
-      charts[key].update();
-    });
+  const useChamp = this.checked;
+  Object.keys(charts).forEach(key => {
+    const raw = chartsData[key];
+    charts[key].data.labels = useChamp ? raw.champions : raw.labels;
+    charts[key].data.datasets[0].backgroundColor = teamColors(raw.teams, raw.labels);
+    charts[key].update();
   });
+});
 
   const slider      = document.getElementById('timeline-slider');
   const minuteLabel = document.getElementById('minute-label');

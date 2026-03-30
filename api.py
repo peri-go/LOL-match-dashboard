@@ -23,6 +23,20 @@ QUEUE_NAMES = {
     400: 'Normal Draft', 430: 'Normal Blind', 900: 'URF',
 }
 
+SUMMONER_SPELLS = {
+    1:  'SummonerBoost',
+    3:  'SummonerExhaust',
+    4:  'SummonerFlash',
+    6:  'SummonerHaste',
+    7:  'SummonerHeal',
+    11: 'SummonerSmite',
+    12: 'SummonerTeleport',
+    13: 'SummonerMana',
+    14: 'SummonerDot',
+    21: 'SummonerBarrier',
+    32: 'SummonerSnowball',
+}
+
 # ── cache helpers ─────────────────────────────────────────────────────────────
 
 def cache_path(key):
@@ -123,9 +137,11 @@ def get_match_history(puuid, runes, region=None):
         kda = (me['kills'] + me['assists']) / max(me['deaths'], 1)
         keystone = pri_sel[0].get("perk") if pri_sel else None,
         secondary = sub.get("style")
+
         rows.append({
             'match_id':     mid,
             'champion':     me.get('championName', '?'),
+            'champion_icon':analysis.champ_icon_url(me.get('championName')),
             'position':     me.get('teamPosition') or me.get('individualPosition', ''),
             'queue':        QUEUE_NAMES.get(info.get('queueId'), 'Other'),
             'win':          me.get('win', False),
@@ -139,9 +155,11 @@ def get_match_history(puuid, runes, region=None):
             'duration_s':   dur % 60,
             'patch':        info.get('gameVersion', '').rsplit('.', 1)[0],
             'level': me.get('champLevel', 0),
+            'spell_1': analysis.spell_url(SUMMONER_SPELLS[me.get('summoner1Id', 0)]),
+            'spell_2': analysis.spell_url(SUMMONER_SPELLS[me.get('summoner2Id', 0)]),
             'keystone':     runes[keystone[0]],
             'secondary':    runes[secondary],
-            "item": [me.get(f"item{i}") for i in range(6)]
+            "item": [me.get(f"item{i}") for i in range(6)],
         })
         time.sleep(0.05)
     return rows
@@ -174,6 +192,26 @@ def build_all_players_csv(match_id, region=None):
     if not match:
         raise ValueError(f'Could not fetch match {match_id}')
 
+    info  = match.get("info", {})
+    teams = {t["teamId"]: t for t in info.get("teams", [])}
+    blue_bans = [b["championId"] for b in teams.get(100,{}).get("bans",[])]
+    red_bans  = [b["championId"] for b in teams.get(200,{}).get("bans",[])]
+    dur   = max(info.get("gameDuration", 1), 1)
+    blue_horde = teams.get(100, {}).get('objectives', {}).get('horde', {})
+    red_horde  = teams.get(200, {}).get('objectives', {}).get('horde', {})
+    blue_horde_kills = blue_horde.get('kills', 0)
+    red_horde_kills  = red_horde.get('kills', 0)
+
+    meta = {
+        "match_id":     match.get("metadata",{}).get("matchId","?"),
+        "patch":        info.get("gameVersion","?").rsplit(".",1)[0],
+        "queue":        info.get("gameMode","?"),
+        "duration_min": round(dur/60,1),
+        "duration_str": f"{dur//60}:{dur%60:02d}",
+        "game_start":   info.get("gameStartTimestamp",""),
+        "source":       "api",
+    }
+
     participants = match['info']['participants']
     rows = []
     for p in participants:
@@ -196,6 +234,7 @@ def build_all_players_csv(match_id, region=None):
             # champion
             "champion_id":               p.get("championId"),
             "champion_name":             p.get("championName"),
+            "champion_icon":             analysis.champ_icon_url(p.get("championName")),
             "champion_level":            p.get("champLevel"),
             "champion_xp":               p.get("champExperience"),
             "champion_transform":        p.get("championTransform"),
@@ -331,11 +370,29 @@ def build_all_players_csv(match_id, region=None):
             "turret_plates_taken":       p.get("challenges", {}).get("turretPlatesTaken"),
             "saving_ally":               p.get("challenges", {}).get("saveAllyFromDeath"),
         })
-
+        team_stats = {}
+    for tid, tlabel in [(100,"blue"),(200,"red")]:
+        tp  = [p for p in rows if p["team"]==tlabel]
+        bans= blue_bans if tlabel=="blue" else red_bans
+        map = analysis.champion_map()
+        team_stats[tlabel] = {
+            "win":         bool(teams.get(tid,{}).get("win",False)),
+            "kills":       sum(p["kills"]        for p in tp),
+            "deaths":      sum(p["deaths"]       for p in tp),
+            "assists":     sum(p["assists"]      for p in tp),
+            "gold":        sum(p["gold_earned"]  for p in tp),
+            "damage":      sum(p["dmg_to_champions"]    for p in tp),
+            "barons":      sum(p['baron_kills'] for p in tp),
+            "dragons":     sum(p['dragon_kills'] for p in tp),
+            "towers":      sum(p['turret_kills'] for p in tp),
+            "inhibitors":  sum(p['inhibitor_kills'] for p in tp),
+            "voidgrubs":   blue_horde_kills if tlabel == "blue" else red_horde_kills,
+            "bans":        [analysis.champ_id_icon(i,map) for i in bans],
+        }
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     path = os.path.join(UPLOAD_DIR, f'{match_id}_all_players.csv')
     pd.DataFrame(rows).to_csv(path, index=False)
-    return path
+    return path,{'meta': meta, 'team_stats' : team_stats}
 
 def build_timeline_csv(match_id, region=None):
     _, tl = get_full_match(match_id, region)

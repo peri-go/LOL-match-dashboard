@@ -11,17 +11,37 @@ def get_ddragon_version():
         r = requests.get('https://ddragon.leagueoflegends.com/api/versions.json', timeout=5)
         _DDRAGON_VERSION = r.json()[0]
     except:
-        _DDRAGON_VERSION = '14.24.1'
+        _DDRAGON_VERSION = '16.6.1'
     return _DDRAGON_VERSION
+
+def champion_map():
+    c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)
+    m = c.json()
+    map={}
+    for i in m['data']:
+        map[m['data'][i]['key']] = m['data'][i]['id']
+    
+    return map
 
 def item_url(item_id):
     if not item_id or int(item_id) == 0:
         return None
     return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/item/{int(item_id)}.png'
 
+def champ_id_icon(id, map):
+    if id == -1:
+        return None
+    else:
+        champ = map[str(id)]
+        url = champ_icon_url(champ)
+        return url
+
 def champ_icon_url(champ_name):
     name = (champ_name or 'Ahri').replace(' ', '').replace("'", '').replace('.', '')
     return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/champion/{name}.png'
+
+def spell_url(spell):
+    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/spell/{spell}.png'
 
 def get_rune_paths():
     try: 
@@ -44,9 +64,10 @@ def load_csvs(all_players_path, timeline_path):
     return df_players, df_timeline
 
 def get_scoreboard(df_players):
+    max_damage = int(df_players['dmg_to_champions'].max())
     def enrich(rows):
         for r in rows:
-            r['champ_icon'] = champ_icon_url(r.get('champion_name', 'Ahri'))
+            r['max_damage'] = max_damage
         return rows
     blue = enrich(df_players[df_players['team_id'] == 100].to_dict(orient='records'))
     red  = enrich(df_players[df_players['team_id'] == 200].to_dict(orient='records'))
@@ -110,7 +131,6 @@ def get_timeline_events(df_timeline, pid_map):
 def build_analysis(all_players_path, timeline_path, summoner_name=None):
     df_players, df_timeline = load_csvs(all_players_path, timeline_path)
     pid_map = build_pid_map(df_players)
-
     return {
         'scoreboard':   get_scoreboard(df_players),
         'player_stats': None,
