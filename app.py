@@ -3,15 +3,13 @@ import json
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 from werkzeug.utils import secure_filename
 import api
-import analysis
 
 app = Flask(__name__)
 app.secret_key = 'lol-analyzer-secret'
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
-runes = analysis.get_rune_paths()
-# ── Page 1: landing ──────────────────────────────────────────────────────────
+runes = api.get_rune_paths()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -33,8 +31,6 @@ def index():
 
     return render_template('index.html', error=error,regions = REGIONS)
 
-# ── Page 2: match history ────────────────────────────────────────────────────
-
 @app.route('/history')
 def match_history():
     puuid = session.get('puuid')
@@ -50,6 +46,18 @@ def match_history():
 
     return render_template('history.html', history=history, summoner=summoner_name, error=None)
 
+@app.route('/history/load')
+def history_load():
+    puuid  = session.get('puuid')
+    runes  = session.get('runes')
+    region = session.get('region', 'BR')
+    page   = int(request.args.get('page', 0))
+    per_page = 10
+
+    ids     = api.riot_get(puuid, region, start=page * per_page, count=per_page)
+    matches = api.build_match_history(puuid, runes, ids, region)
+    return jsonify({'matches': matches, 'done': len(matches) < per_page})
+
 @app.route('/select_match/<match_id>')
 def select_match(match_id):
     try:
@@ -63,8 +71,6 @@ def select_match(match_id):
     except Exception as e:
         return f'Error fetching match data: {e}', 500
 
-# ── Page 3: analysis ─────────────────────────────────────────────────────────
-
 @app.route('/analysis')
 def analysis_page():
     all_players_path = session.get('all_players_path')
@@ -75,7 +81,7 @@ def analysis_page():
         return redirect(url_for('index'))
 
     try:
-        data = analysis.build_analysis(all_players_path, timeline_path, summoner_name)
+        data = api.build_analysis(all_players_path, timeline_path, summoner_name)
     except Exception as e:
         return f'Error building analysis: {e}', 500
     return render_template('analysis.html',
@@ -85,6 +91,17 @@ def analysis_page():
         timeline=json.dumps(data['timeline']),
         summoner=summoner_name,
         match= match)
+
+@app.route('/search/<summoner_name>/<tagline>')
+def search_summoner(summoner_name, tagline):
+    try:
+        puuid, display_name = api.get_puuid(summoner_name, tagline)
+        session['puuid'] = puuid
+        session['summoner_name'] = display_name
+        session['region'] = session.get('region', 'BR')
+        return redirect(url_for('match_history'))
+    except Exception as e:
+        return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)

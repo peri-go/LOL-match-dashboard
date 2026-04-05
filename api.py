@@ -3,8 +3,8 @@ import json
 import time
 import requests
 import pandas as pd
-import analysis
-from config import API_KEY,MAX_MATCHES
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from config import API_KEY
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 
@@ -37,6 +37,19 @@ SUMMONER_SPELLS = {
     32: 'SummonerSnowball',
 }
 
+_DDRAGON_VERSION = None
+
+def get_ddragon_version():
+    global _DDRAGON_VERSION
+    if _DDRAGON_VERSION:
+        return _DDRAGON_VERSION
+    try:
+        r = requests.get('https://ddragon.leagueoflegends.com/api/versions.json', timeout=5)
+        _DDRAGON_VERSION = r.json()[0]
+    except:
+        _DDRAGON_VERSION = '16.7.1'
+    return _DDRAGON_VERSION
+
 # ── cache helpers ─────────────────────────────────────────────────────────────
 
 def cache_path(key):
@@ -52,7 +65,7 @@ def load_cache(key):
 def save_cache(key, data):
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(cache_path(key), 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
 
 # ── http ──────────────────────────────────────────────────────────────────────
 
@@ -104,16 +117,15 @@ def get_puuid(name, tagline=''):
 
 # ── match list ────────────────────────────────────────────────────────────────
 
-def get_match_history(puuid, runes, region=None):
+def get_match_history(puuid, runes, region=None,start= 0,count= 20):
     region    = (region).upper()
     continent = CONTINENTAL.get(region, 'americas')
 
     ids = riot_get(
-        f'https://{continent}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?count={MAX_MATCHES}'
+        f'https://{continent}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?start={start}&count={count}'
     ) or []
 
-    rows = []
-    for mid in ids:
+    def fetch_one(mid):
         if is_cached(mid):
             m = load_cache(mid)
         else:
@@ -121,27 +133,26 @@ def get_match_history(puuid, runes, region=None):
             if m:
                 save_cache(mid, m)
         if not m:
-            continue
+            return None
 
         info = m['info']
         me   = next((p for p in info['participants'] if p['puuid'] == puuid), None)
-        if not me:
-            continue
+        if not me or info.get('queueId') not in QUEUE_NAMES:
+            return None
 
-        perks      = me.get("perks", {})
-        styles     = perks.get("styles", [])
-        pri        = styles[0] if styles else {}
-        sub        = styles[1] if len(styles) > 1 else {}
-        pri_sel    = pri.get("selections", [{}])
-        dur = max(info.get('gameDuration', 1), 1)
-        kda = (me['kills'] + me['assists']) / max(me['deaths'], 1)
-        keystone = pri_sel[0].get("perk") if pri_sel else None,
-        secondary = sub.get("style")
-
-        rows.append({
+        perks     = me.get('perks', {})
+        styles    = perks.get('styles', [])
+        pri       = styles[0] if styles else {}
+        sub       = styles[1] if len(styles) > 1 else {}
+        pri_sel   = pri.get('selections', [{}])
+        dur       = max(info.get('gameDuration', 1), 1)
+        kda       = (me['kills'] + me['assists']) / max(me['deaths'], 1)
+        keystone  = pri_sel[0].get('perk') if pri_sel else None
+        secondary = sub.get('style')
+        row = {
             'match_id':     mid,
             'champion':     me.get('championName', '?'),
-            'champion_icon':analysis.champ_icon_url(me.get('championName')),
+            'champion_icon': champ_icon_url(me.get('championName')),
             'position':     me.get('teamPosition') or me.get('individualPosition', ''),
             'queue':        QUEUE_NAMES.get(info.get('queueId'), 'Other'),
             'win':          me.get('win', False),
@@ -154,16 +165,27 @@ def get_match_history(puuid, runes, region=None):
             'duration_m':   dur // 60,
             'duration_s':   dur % 60,
             'patch':        info.get('gameVersion', '').rsplit('.', 1)[0],
-            'level': me.get('champLevel', 0),
-            'spell_1': analysis.spell_url(SUMMONER_SPELLS[me.get('summoner1Id', 0)]),
-            'spell_2': analysis.spell_url(SUMMONER_SPELLS[me.get('summoner2Id', 0)]),
-            'keystone':     runes[keystone[0]],
-            'secondary':    runes[secondary],
-            "item": [me.get(f"item{i}") for i in range(6)],
-        })
-        rows[-1]['item'].insert(3,me.get(f"item6"))
-        rows[-1]['item'].append(me.get("roleBoundItem"))
-        time.sleep(0.05)
+            'level':        me.get('champLevel', 0),
+            'spell_1':      spell_url(me.get('summoner1Id', 0)),
+            'spell_2':      spell_url(me.get('summoner2Id', 0)),
+            'keystone':     runes.get(keystone),
+            'secondary':    runes.get(secondary),
+            'item':         [me.get(f'item{i}') for i in range(6)],
+        }
+        row['item'].insert(3, me.get('item6'))
+        row['item'].append(me.get('roleBoundItem'))
+        return row
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = {executor.submit(fetch_one, mid): mid for mid in ids}
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                rows.append(result)
+
+    id_order = {mid: i for i, mid in enumerate(ids)}
+    rows.sort(key=lambda r: id_order.get(r['match_id'], 0))
     return rows
 
 # ── full match fetch + CSV build ──────────────────────────────────────────────
@@ -236,7 +258,6 @@ def build_all_players_csv(match_id, region=None):
             # champion
             "champion_id":               p.get("championId"),
             "champion_name":             p.get("championName"),
-            "champion_icon":             analysis.champ_icon_url(p.get("championName")),
             "champion_level":            p.get("champLevel"),
             "champion_xp":               p.get("champExperience"),
             "champion_transform":        p.get("championTransform"),
@@ -377,7 +398,9 @@ def build_all_players_csv(match_id, region=None):
     for tid, tlabel in [(100,"blue"),(200,"red")]:
         tp  = [p for p in rows if p["team"]==tlabel]
         bans= blue_bans if tlabel=="blue" else red_bans
-        map = analysis.champion_map()
+        map = champion_map()
+        result = [champ_id_icon(i,map) for i in bans]
+        icon,ban = zip(*result)
         team_stats[tlabel] = {
             "win":         bool(teams.get(tid,{}).get("win",False)),
             "kills":       sum(p["kills"]        for p in tp),
@@ -390,7 +413,8 @@ def build_all_players_csv(match_id, region=None):
             "towers":      sum(p['turret_kills'] for p in tp),
             "inhibitors":  sum(p['inhibitor_kills'] for p in tp),
             "voidgrubs":   blue_horde_kills if tlabel == "blue" else red_horde_kills,
-            "bans":        [analysis.champ_id_icon(i,map) for i in bans],
+            "icons" :      icon,
+            "bans"  :      ban,
         }
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     path = os.path.join(UPLOAD_DIR, f'{match_id}_all_players.csv')
@@ -427,3 +451,144 @@ def build_timeline_csv(match_id, region=None):
     path = os.path.join(UPLOAD_DIR, f'{match_id}_tl_events.csv')
     pd.DataFrame(events).to_csv(path, index=False)
     return path
+
+def champion_map():
+    c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)
+    m = c.json()
+    map={}
+    for i in m['data']:
+        map[m['data'][i]['key']] = m['data'][i]['id']
+    return map
+
+def item_url(item_id):
+    if not item_id or int(item_id) == 0:
+        return None
+    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/item/{int(item_id)}.png'
+
+def champ_id_icon(id, map):
+    if id == -1:
+        return (),()
+    else:
+        champ = map[str(id)]
+        url = champ_icon_url(champ)
+        return url,champ
+
+def champ_icon_url(champ_name):
+    name = (champ_name or 'Ahri').replace(' ', '').replace("'", '').replace('.', '')
+    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/champion/{name}.png'
+
+def spell_url(id):
+    spell = SUMMONER_SPELLS.get(id)
+    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/spell/{spell}.png'
+
+def get_rune_paths():
+    try: 
+        r = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/runesReforged.json', timeout=5)
+        runes = r.json()
+        base = "https://ddragon.leagueoflegends.com/cdn/img/"
+        rune_icons = {}
+        for tree in runes:
+            rune_icons[tree['id']] = base + tree['icon']
+            for slot in tree["slots"]:
+                for rune in slot["runes"]:
+                    rune_icons[rune['id']] = base + rune['icon']
+        return rune_icons
+    except:
+        return None
+    
+runes = get_rune_paths()  
+
+def load_csvs(all_players_path, timeline_path):
+    df_players  = pd.read_csv(all_players_path)
+    df_timeline = pd.read_csv(timeline_path)
+    return df_players, df_timeline
+
+def get_scoreboard(df_players):
+    max_damage = int(df_players['dmg_to_champions'].max())
+    def enrich(rows):
+        for r in rows:
+            r['max_damage'] = max_damage
+        return rows
+    blue = enrich(df_players[df_players['team_id'] == 100].to_dict(orient='records'))
+    red  = enrich(df_players[df_players['team_id'] == 200].to_dict(orient='records'))
+    return {'blue': blue, 'red': red}
+
+def build_pid_map(df_players):
+    pid_map = {}
+    for _, row in df_players.iterrows():
+        pid = int(row['participant_id'])
+        pid_map[pid] = {
+            'champion_name':      row.get('champion_name', '?'),
+            'summoner_name': row.get('summoner_name', '?'),
+            'team_id':       int(row.get('team_id', 100)),
+        }
+    return pid_map
+
+def get_chart(df_players, col):
+    data = df_players.sort_values(col, ascending=False)
+    return {
+        'labels':    data['summoner_name'].tolist(),
+        'champions': data['champion_name'].tolist(),
+        'values':    data[col].tolist(),
+        'teams':     data['team_id'].tolist(),
+    }
+
+def get_timeline_events(df_timeline, pid_map):
+    minutes = sorted(df_timeline['timestamp_min'].unique().tolist())
+    events_by_minute = {}
+
+    for minute in minutes:
+        rows = df_timeline[df_timeline['timestamp_min'] == minute]
+        events = []
+        for _, e in rows.iterrows():
+            etype     = str(e.get('type', ''))
+            killer_id = int(e['killer_id']) if str(e.get('killer_id', '')).replace('.0','').isdigit() else 0
+            victim_id = int(e['victim_id']) if str(e.get('victim_id', '')).replace('.0','').isdigit() else 0
+            item_id   = int(e['item_id'])   if str(e.get('item_id',   '')).replace('.0','').isdigit() else 0
+
+            killer_info = pid_map.get(killer_id, {})
+            victim_info = pid_map.get(victim_id, {})
+
+            events.append({
+                'type':          etype,
+                'killer_champ':  killer_info.get('champion', f'P{killer_id}'),
+                'killer_team':   killer_info.get('team_id', 100),
+                'victim_champ':  victim_info.get('champion', f'P{victim_id}'),
+                'victim_team':   victim_info.get('team_id', 200),
+                'item_id':       item_id,
+                'item_url':      item_url(item_id) if item_id else None,
+                'building_type': str(e.get('building_type', '') or ''),
+                'monster_type':  str(e.get('monster_type',  '') or ''),
+            })
+
+        events_by_minute[int(minute)] = events
+
+    return {
+        'minutes': [int(m) for m in minutes],
+        'events':  events_by_minute,
+    }
+ 
+def build_analysis(all_players_path, timeline_path, summoner_name=None):
+    df_players, df_timeline = load_csvs(all_players_path, timeline_path)
+    pid_map = build_pid_map(df_players)
+    new_cols = pd.DataFrame({
+    'key_icon': df_players['rune_keystone'].map(runes),
+    'sub_icon': df_players['rune_sub_style'].map(runes),
+    'spell_1': df_players['summoner1_id'].apply(spell_url),
+    'spell_2': df_players['summoner2_id'].apply(spell_url),
+    'champion_icon': df_players['champion_name'].apply(champ_icon_url)
+    })
+
+    df_players = pd.concat([df_players, new_cols], axis=1)
+    return {
+        'scoreboard':   get_scoreboard(df_players),
+        'player_stats': None,
+        'charts': {
+            'damage': get_chart(df_players, 'dmg_to_champions'),
+            'gold':   get_chart(df_players, 'gold_earned'),
+            'cs':     get_chart(df_players, 'cs'),
+            'kda':    get_chart(df_players, 'kda'),
+            'vision': get_chart(df_players, 'vision_score'),
+        },
+        'timeline': get_timeline_events(df_timeline, pid_map),
+    }
