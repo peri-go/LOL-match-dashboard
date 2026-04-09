@@ -62,10 +62,8 @@ def history_load():
 def select_match(match_id):
     try:
         all_players_path,match = api.build_all_players_csv(match_id,session['region'])
-        timeline_path = api.build_timeline_csv(match_id,session['region'])
         session['all_players_path'] = all_players_path
         session['match'] = match
-        session['timeline_path'] = timeline_path
         session['match_id'] = match_id
         return redirect(url_for('analysis_page'))
     except Exception as e:
@@ -74,23 +72,25 @@ def select_match(match_id):
 @app.route('/analysis')
 def analysis_page():
     all_players_path = session.get('all_players_path')
-    timeline_path = session.get('timeline_path')
     summoner_name = session.get('summoner_name')
     match = session.get('match')
-    if not all_players_path or not timeline_path:
+    match_id = session.get('match_id')
+    region = session.get('region')
+    if not all_players_path:
         return redirect(url_for('index'))
 
     try:
-        data = api.build_analysis(all_players_path, timeline_path, summoner_name)
+        data = api.build_analysis(all_players_path, summoner_name)
+        timeline = api.build_timeline(match_id, region)
     except Exception as e:
         return f'Error building analysis: {e}', 500
     return render_template('analysis.html',
         scoreboard=data['scoreboard'],
         player_stats=data['player_stats'],
         charts=json.dumps(data['charts']),
-        timeline=json.dumps(data['timeline']),
         summoner=summoner_name,
-        match= match)
+        match= match,
+        timeline= timeline)
 
 @app.route('/search/<summoner_name>/<tagline>')
 def search_summoner(summoner_name, tagline):

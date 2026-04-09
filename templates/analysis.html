@@ -23,7 +23,8 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('scoreboard', this)">Scoreboard</button>
   <button class="tab-btn" onclick="switchTab('charts', this)">Charts</button>
-  <button class="tab-btn" onclick="switchTab('timeline', this)">Timeline</button>
+  <button class="tab-btn" onclick="switchTab('builds', this)">Builds</button>
+  <!-- <button class="tab-btn" onclick="switchTab('timeline', this)">Timeline</button> -->
 </div>
 
 <!-- ── SCOREBOARD ─────────────────────────────────────────────────────────── -->
@@ -65,9 +66,7 @@
       {% endif %}
       </div>
       {% for ban in t.icons%}
-        {% if ban%}
         <img src="{{ ban }}" title="{{t.bans[loop.index0]}}" class="ban_icon">
-        {% endif %}
         {% endfor %}
       </div>
     </div>
@@ -109,12 +108,12 @@
           <td style="max-width: 150px;">
             <div class="champ-cell">
             <div style="position: relative; bottom: 5px;width: 28px; height: 28px; flex-shrink: 0;">
-  <img src="{{p.champion_icon }}" class="champ-icon" onerror="this.style.display='none'">
+  <img src="{{p.champion_icon }}" title="{{p.champion_name}}" class="champ-icon" onerror="this.style.display='none'">
   <span style="position: absolute; bottom: -10px; right: -9px; font-size: 9px; font-weight: 600;
                background: var(--bg); color: var(--text); line-height: 1;
                padding: 1px 3px; border-radius: 3px;">{{ p.champion_level }}</span>
 </div>
-            <div style="font-weight:600;font-size:12px;margin-left: 14px">{{ p.summoner_name }}#{{ p.tagline }}<div style="font-size:10px;color: var(--muted)">
+            <div style="font-weight:600;font-size:12px;margin-left: 14px">{{ p.summoner_name }}<span style="color: var(--muted)">#{{ p.tagline }}</span ><div style="font-size:10px;color: var(--muted)">
                   {{ p.champion_name }}{% if p.position %} · {% if p.position == 'UTILITY'%} Support {% else %}{{ p.position | capitalize }}{% endif %}{% endif %}
                 </div></div>
           </div>
@@ -184,7 +183,7 @@
 </div>
 
 <!-- ── TIMELINE ───────────────────────────────────────────────────────────── -->
-<div id="tab-timeline" class="tab-panel">
+<!-- <div id="tab-timeline" class="tab-panel">
   <div class="card" style="margin-bottom: 20px;">
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
       <div class="section-title" style="margin-bottom: 0;">Minute</div>
@@ -197,11 +196,34 @@
     </div>
   </div>
   <div id="timeline-events" style="display: flex; flex-direction: column; gap: 4px; max-height: 520px; overflow-y: auto;"></div>
+</div> -->
+
+<!-- ── BUILDS ───────────────────────────────────────────────────────────── -->
+<div id="tab-builds" class="tab-panel">
+  {% for team_key, team_label, team_cls in [('blue', 'Blue Team', 'team-blue'), ('red', 'Red Team', 'team-red')] %}
+    {% for p in scoreboard[team_key] %}
+    <div class="card item-timeline" style="margin-bottom: 20px;width: auto;">
+      <div style="width: 100%; margin-bottom: 10px;">
+        <span class="p-item-name" style="margin-right: 5px;">{{p.champion_name}}</span>
+        <span class="badge {{ 'badge-blue' if p.team =='blue' else 'badge-loss' }}">{{ 'BLUE' if p.team=='blue' else 'RED' }}</span>
+      </div>
+      {% for event in timeline %}
+        {% if event.killer_id==p.participant_id|string and event.type in ['ITEM_SOLD','ITEM_PURCHASED','ITEM_UNDO']%}
+        <div class="i-entry {{'sell' if event.type=='ITEM_SOLD' else ''}}">
+          <img src="{{event.item_url}}"
+             style="width: 32px; height: 32px; border-radius: 3px;"
+             title="{{event.item_name}}" onerror="this.style.display='none'">
+             <span class="i-time">{{"{:,.2f}".format(event.timestamp_min)}}</span>
+            <span class="i-name">{{event.item_name}}</span></div>
+        {% endif%}
+    {% endfor %}
+    </div>
+    {% endfor %}
+  {% endfor %}
 </div>
 
 <script>
   const chartsData   = {{ charts|safe }};
-  const timelineData = {{ timeline|safe }};
   const summoner     = "{{ summoner or '' }}";
 
   function switchTab(name, btn) {
@@ -260,57 +282,6 @@
   });
 });
 
-  const slider      = document.getElementById('timeline-slider');
-  const minuteLabel = document.getElementById('minute-label');
-  const eventsDiv   = document.getElementById('timeline-events');
-  const minutes     = timelineData.minutes;
 
-  if (minutes.length > 0) {
-    slider.min = minutes[0];
-    slider.max = minutes[minutes.length - 1];
-    slider.value = minutes[0];
-    document.getElementById('tl-min-label').textContent = minutes[0] + 'm';
-    document.getElementById('tl-max-label').textContent = minutes[minutes.length - 1] + 'm';
-    renderEvents(minutes[0]);
-  }
-
-  slider.addEventListener('input', () => {
-    const min = parseInt(slider.value);
-    minuteLabel.textContent = min;
-    renderEvents(min);
-  });
-
-  function tc(team_id) { return team_id === 100 ? 'var(--blue)' : 'var(--loss)'; }
-  function champ(name, team_id) { return `<span style="color:${tc(team_id)};font-weight:500;">${name}</span>`; }
-  function itemImg(url, id) { return url ? `<img src="${url}" alt="item ${id}" class="item-icon" onerror="this.style.display='none'">` : ''; }
-
-  function renderEvents(minute) {
-    const events = timelineData.events[minute] || [];
-    if (!events.length) {
-      eventsDiv.innerHTML = `<div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">No events at minute ${minute}</div>`;
-      return;
-    }
-    eventsDiv.innerHTML = events.map(e => {
-      let cls = '', icon = '', text = '';
-      if (e.type === 'CHAMPION_KILL') {
-        cls = 'kill'; icon = '⚔';
-        text = `${champ(e.killer_champ, e.killer_team)} killed ${champ(e.victim_champ, e.victim_team)}`;
-      } else if (e.type === 'BUILDING_KILL') {
-        cls = 'build'; icon = '🏰';
-        text = `${champ(e.killer_champ, e.killer_team)} destroyed ${(e.building_type||'').replace(/_/g,' ').toLowerCase() || 'a structure'}`;
-      } else if (e.type === 'ELITE_MONSTER_KILL') {
-        cls = 'obj'; icon = '🐉';
-        text = `${champ(e.killer_champ, e.killer_team)} slew ${(e.monster_type||'').replace(/_/g,' ').toLowerCase() || 'a monster'}`;
-      } else if (e.type === 'ITEM_PURCHASED') {
-        cls = 'item';
-        text = `${champ(e.killer_champ, e.killer_team)} purchased ${itemImg(e.item_url, e.item_id)}`;
-      }
-      return `<div class="tl-event ${cls}">
-        <span class="tl-time">${minute}m</span>
-        ${icon ? `<span style="font-size:14px;">${icon}</span>` : ''}
-        <span>${text}</span>
-      </div>`;
-    }).join('');
-  }
 </script>
 {% endblock %}

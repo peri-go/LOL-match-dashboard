@@ -112,38 +112,4 @@
 </div>
 {% endif %}
 
-<script>
-let page = 0;
-let loading = false;
-let done = false;
-
-async function loadMore() {
-    if (loading || done) return;
-    loading = true;
-    showSpinner();
-
-    const res  = await fetch(`/history/load?page=${page}`);
-    const data = await res.json();
-
-    appendRows(data.matches);
-    done = data.done;
-    page++;
-    loading = false;
-    hideSpinner();
-}
-
-// trigger on scroll
-window.addEventListener('scroll', () => {
-    const near = window.innerHeight + window.scrollY >= document.body.offsetHeight - 300;
-
-    console.log({
-        innerHeight: window.innerHeight,
-        scrollY: window.scrollY,
-        offsetHeight: document.body.offsetHeight,
-        near
-    });
-
-    if (near) loadMore();
-});
-</script>
 {% endblock %}

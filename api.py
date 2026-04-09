@@ -190,7 +190,7 @@ def get_match_history(puuid, runes, region=None,start= 0,count= 20):
 
 # ── full match fetch + CSV build ──────────────────────────────────────────────
 
-def get_full_match(match_id, region=None):
+def get_match(match_id, region=None):
     region    = (region).upper()
     continent = CONTINENTAL.get(region, 'americas')
 
@@ -200,6 +200,11 @@ def get_full_match(match_id, region=None):
         match = riot_get(f'https://{continent}.api.riotgames.com/lol/match/v5/matches/{match_id}')
         if match:
             save_cache(match_id, match)
+    return match
+
+def get_timeline(match_id, region=None):
+    region    = (region).upper()
+    continent = CONTINENTAL.get(region, 'americas')
 
     tl_key = f'{match_id}_timeline'
     if is_cached(tl_key):
@@ -209,10 +214,10 @@ def get_full_match(match_id, region=None):
         if tl:
             save_cache(tl_key, tl)
 
-    return match, tl
+    return tl
 
 def build_all_players_csv(match_id, region=None):
-    match, _ = get_full_match(match_id, region)
+    match = get_match(match_id, region)
     if not match:
         raise ValueError(f'Could not fetch match {match_id}')
 
@@ -421,8 +426,8 @@ def build_all_players_csv(match_id, region=None):
     pd.DataFrame(rows).to_csv(path, index=False)
     return path,{'meta': meta, 'team_stats' : team_stats}
 
-def build_timeline_csv(match_id, region=None):
-    _, tl = get_full_match(match_id, region)
+def build_timeline(match_id, region=None):
+    tl = get_timeline(match_id, region)
     if not tl:
         raise ValueError(f'Could not fetch timeline for {match_id}')
 
@@ -431,26 +436,26 @@ def build_timeline_csv(match_id, region=None):
         timestamp_min = frame['timestamp'] // 60000
         for event in frame['events']:
             e_type = event.get('type', '')
-            if e_type not in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL', 'ITEM_PURCHASED'):
+            item_id = str(event.get('itemId'))
+            if e_type not in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL', 'ITEM_PURCHASED','ITEM_SOLD') or item_id not in items:
                 continue
             events.append({
                 'timestamp_min': timestamp_min,
                 'timestamp_ms':  event.get('timestamp'),
                 'type':          e_type,
-                'killer_id':     event.get('killerId') or event.get('creatorId') or event.get('participantId'),
-                'victim_id':     event.get('victimId'),
+                'killer_id':     str(event.get('killerId') or event.get('creatorId') or event.get('participantId')),
+                'victim_id':     str(event.get('victimId')),
                 'assisting_ids': str(event.get('assistingParticipantIds', [])),
-                'item_id':       event.get('itemId'),
+                'item_id':       item_id,
+                'item_url':      item_url(item_id),
+                'item_name':     items[item_id],
                 'building_type': event.get('buildingType'),
                 'monster_type':  event.get('monsterType'),
                 'position_x':    event.get('position', {}).get('x'),
                 'position_y':    event.get('position', {}).get('y'),
             })
-
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    path = os.path.join(UPLOAD_DIR, f'{match_id}_tl_events.csv')
-    pd.DataFrame(events).to_csv(path, index=False)
-    return path
+    print(events)
+    return events
 
 def champion_map():
     c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)
@@ -460,6 +465,30 @@ def champion_map():
         map[m['data'][i]['key']] = m['data'][i]['id']
     return map
 
+def filter_item(item):
+    tags = item.get("tags", [])
+
+    if "Consumable" in tags:
+        return False
+    if "Trinket" in tags:
+        return False
+
+    if not item.get("gold", {}).get("purchasable", True):
+        return False
+
+    return True
+
+def item_map():
+    data = requests.get(
+        f"https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/item.json"
+    ).json()
+
+    return {
+        item_id: item["name"]
+        for item_id, item in data["data"].items()
+        if filter_item(item)
+    }
+
 def item_url(item_id):
     if not item_id or int(item_id) == 0:
         return None
@@ -467,7 +496,7 @@ def item_url(item_id):
 
 def champ_id_icon(id, map):
     if id == -1:
-        return (),()
+        return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/profileicon/29.png','None'
     else:
         champ = map[str(id)]
         url = champ_icon_url(champ)
@@ -497,11 +526,11 @@ def get_rune_paths():
         return None
     
 runes = get_rune_paths()  
+items = item_map()
 
-def load_csvs(all_players_path, timeline_path):
+def load_csvs(all_players_path):
     df_players  = pd.read_csv(all_players_path)
-    df_timeline = pd.read_csv(timeline_path)
-    return df_players, df_timeline
+    return df_players
 
 def get_scoreboard(df_players):
     max_damage = int(df_players['dmg_to_champions'].max())
@@ -533,44 +562,8 @@ def get_chart(df_players, col):
         'teams':     data['team_id'].tolist(),
     }
 
-def get_timeline_events(df_timeline, pid_map):
-    minutes = sorted(df_timeline['timestamp_min'].unique().tolist())
-    events_by_minute = {}
-
-    for minute in minutes:
-        rows = df_timeline[df_timeline['timestamp_min'] == minute]
-        events = []
-        for _, e in rows.iterrows():
-            etype     = str(e.get('type', ''))
-            killer_id = int(e['killer_id']) if str(e.get('killer_id', '')).replace('.0','').isdigit() else 0
-            victim_id = int(e['victim_id']) if str(e.get('victim_id', '')).replace('.0','').isdigit() else 0
-            item_id   = int(e['item_id'])   if str(e.get('item_id',   '')).replace('.0','').isdigit() else 0
-
-            killer_info = pid_map.get(killer_id, {})
-            victim_info = pid_map.get(victim_id, {})
-
-            events.append({
-                'type':          etype,
-                'killer_champ':  killer_info.get('champion', f'P{killer_id}'),
-                'killer_team':   killer_info.get('team_id', 100),
-                'victim_champ':  victim_info.get('champion', f'P{victim_id}'),
-                'victim_team':   victim_info.get('team_id', 200),
-                'item_id':       item_id,
-                'item_url':      item_url(item_id) if item_id else None,
-                'building_type': str(e.get('building_type', '') or ''),
-                'monster_type':  str(e.get('monster_type',  '') or ''),
-            })
-
-        events_by_minute[int(minute)] = events
-
-    return {
-        'minutes': [int(m) for m in minutes],
-        'events':  events_by_minute,
-    }
- 
-def build_analysis(all_players_path, timeline_path, summoner_name=None):
-    df_players, df_timeline = load_csvs(all_players_path, timeline_path)
-    pid_map = build_pid_map(df_players)
+def build_analysis(all_players_path, summoner_name=None):
+    df_players = load_csvs(all_players_path)
     new_cols = pd.DataFrame({
     'key_icon': df_players['rune_keystone'].map(runes),
     'sub_icon': df_players['rune_sub_style'].map(runes),
@@ -578,7 +571,6 @@ def build_analysis(all_players_path, timeline_path, summoner_name=None):
     'spell_2': df_players['summoner2_id'].apply(spell_url),
     'champion_icon': df_players['champion_name'].apply(champ_icon_url)
     })
-
     df_players = pd.concat([df_players, new_cols], axis=1)
     return {
         'scoreboard':   get_scoreboard(df_players),
@@ -589,6 +581,5 @@ def build_analysis(all_players_path, timeline_path, summoner_name=None):
             'cs':     get_chart(df_players, 'cs'),
             'kda':    get_chart(df_players, 'kda'),
             'vision': get_chart(df_players, 'vision_score'),
-        },
-        'timeline': get_timeline_events(df_timeline, pid_map),
+        }
     }

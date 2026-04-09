@@ -9,7 +9,7 @@
     --border:    #2e2e48;
     --border2:   #3a3a5c;
     --text:      #e2e2f0;
-    --grey:      #747474;
+    --grey:      #b6b6b6;
     --muted:     #7878a8;
     --muted2:    #4f4f7a;
     --blue:      #5383e8;
@@ -153,8 +153,8 @@
   .team-red  { background: var(--red-glow);  color: var(--loss); border-bottom: 1px solid var(--red-dim); }
 
   .champ-cell { display: flex; align-items: center; gap: 4px; }
-  .champ-icon { width: 38px; height: 38px; border-radius: 2px; object-fit: cover; flex-shrink: 0; position: relative; }
-  .history-icon { width: 45px; height: 45px; border-radius: 2px; object-fit: cover; flex-shrink: 0; position: relative; }
+  .champ-icon { width: 38px; height: 38px; border-radius: 2px; object-fit: cover; flex-shrink: 0; position: relative; border: 1px solid var(--border) }
+  .history-icon { width: 45px; height: 45px; border-radius: 2px; object-fit: cover; flex-shrink: 0; position: relative; border: 1px solid var(--border)}
   .rune-key { width: 32px; height: 32px; ; object-fit: cover; flex-shrink: 0; }
   .rune-sec { width: 18px; height: 18px; ; object-fit: cover; flex-shrink: 0; }
   .spell { width: 30px; height: 30px; ; padding: 2px ;object-fit: cover; flex-shrink: 0; }
@@ -178,3 +178,25 @@
   details summary::-webkit-details-marker { display: none; }
   details summary::before { content: '▸ '; }
   details[open] summary::before { content: '▾ '; }
+
+  /* ── items per player ── */
+.p-item-row{background:var(--panel);border:0.5px solid var(--border);
+            border-radius:10px;padding:.9rem 1rem;margin-bottom:7px}
+.p-item-row.focus{border-color:var(--gold)}
+.p-item-header{display:flex;align-items:center;gap:8px;margin-bottom:.6rem}
+.p-item-name{font-size:13px;font-weight:600;vertical-align: center;}
+.item-timeline{display:flex;flex-wrap:wrap;gap:5px}
+.i-entry{display:flex;flex-direction:column;align-items:center;gap:2px;
+         width:52px;cursor:pointer}
+.i-entry img{width:36px;height:36px;border-radius:4px;
+             border:1.5px solid var(--border);object-fit:cover;
+             transition:border-color .15s}
+.i-entry:hover img{border-color:var(--green)}
+.i-entry.sell img{border-color:var(--red);opacity:.5;filter:grayscale(60%)}
+.i-entry.undo img{opacity:.3}
+.i-time{font-size:9px;color:var(--muted);font-family:monospace;text-align:center}
+.i-name{font-size:8px;color:var(--hint);text-align:center;
+        width:36px;word-break:normal;line-height:1.2}
+.i-type{font-size:8px;font-weight:700;padding:0 3px;border-radius:2px}
+.i-type.sell{background:var(--red);color:#fff}
+.i-type.undo{background:var(--muted);color:#fff}
