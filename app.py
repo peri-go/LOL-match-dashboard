@@ -80,8 +80,9 @@ def analysis_page():
         return redirect(url_for('index'))
 
     try:
-        data = api.build_analysis(all_players_path, summoner_name)
         timeline = api.build_timeline(match_id, region)
+        skills = api.build_skill_timeline(match_id, region)
+        data = api.build_analysis(all_players_path, skills,summoner_name)
     except Exception as e:
         return f'Error building analysis: {e}', 500
     return render_template('analysis.html',
@@ -90,7 +91,8 @@ def analysis_page():
         charts=json.dumps(data['charts']),
         summoner=summoner_name,
         match= match,
-        timeline= timeline)
+        timeline= timeline,
+        skills = skills)
 
 @app.route('/search/<summoner_name>/<tagline>')
 def search_summoner(summoner_name, tagline):

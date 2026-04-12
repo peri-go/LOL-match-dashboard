@@ -173,7 +173,7 @@
   .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px 24px; flex: 1; min-width: 100px; text-align: center; }
   .stat-card-value { font-size: 22px; font-weight: 600; }
   .stat-card-label { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.06em; }
-
+  
   details summary { color: var(--muted2); font-size: 12px; cursor: pointer; user-select: none; padding: 8px 0; list-style: none; }
   details summary::-webkit-details-marker { display: none; }
   details summary::before { content: '▸ '; }
@@ -186,8 +186,8 @@
 .p-item-header{display:flex;align-items:center;gap:8px;margin-bottom:.6rem}
 .p-item-name{font-size:13px;font-weight:600;vertical-align: center;}
 .item-timeline{display:flex;flex-wrap:wrap;gap:5px}
-.i-entry{display:flex;flex-direction:column;align-items:center;gap:2px;
-         width:52px;cursor:pointer}
+.i-entry{display:flex;flex-direction:column;align-items:center;gap:2px;position: relative;
+         width:60px;cursor:pointer}
 .i-entry img{width:36px;height:36px;border-radius:4px;
              border:1.5px solid var(--border);object-fit:cover;
              transition:border-color .15s}
@@ -200,3 +200,79 @@
 .i-type{font-size:8px;font-weight:700;padding:0 3px;border-radius:2px}
 .i-type.sell{background:var(--red);color:#fff}
 .i-type.undo{background:var(--muted);color:#fff}
+.badge-sold  { 
+  background: rgba(36, 11, 11, 0.45); 
+  color: var(--red); 
+  position: absolute;
+  top: 8%;
+  display: inline-block; 
+  padding: 2px 6px; 
+  border-radius: 4px; 
+  font-size: 9px; font-weight: 600; 
+  letter-spacing: 0.04em;
+}
+.triangle {
+  width: 0;
+  height: 0;
+  border: solid 6px;
+  border-color: transparent transparent transparent var(--border);
+  position: absolute;
+  right:-20%;
+  top: 13%;
+}
+
+.item-timeline > .i-entry:last-child > .triangle {
+  display: none;
+}
+
+.skillgrid {
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: bold;
+  width: 500px;
+}
+
+.skill-wrapper {
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* cells */
+.skillgrid td {
+  border: 1px solid var(--surface);
+  height: 36px;
+  width: 36px;
+  text-align: center;
+  vertical-align: middle;
+  background: var(--bg2);
+}
+
+.skillgrid td:not(:empty) {
+  background-color: var(--blue-glow);
+  cursor: pointer;
+}
+.skillgrid td:first-child {
+  background-color: var(--blue-dim);
+}
+
+.donut {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  vertical-align: center;
+  position: relative;
+}
+
+/* create the hole */
+.donut::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  background: var(--surface); /* match page background */
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}

@@ -24,6 +24,7 @@
   <button class="tab-btn active" onclick="switchTab('scoreboard', this)">Scoreboard</button>
   <button class="tab-btn" onclick="switchTab('charts', this)">Charts</button>
   <button class="tab-btn" onclick="switchTab('builds', this)">Builds</button>
+  <button class="tab-btn" onclick="switchTab('skills', this)">Skills</button>
   <!-- <button class="tab-btn" onclick="switchTab('timeline', this)">Timeline</button> -->
 </div>
 
@@ -214,13 +215,45 @@
              style="width: 32px; height: 32px; border-radius: 3px;"
              title="{{event.item_name}}" onerror="this.style.display='none'">
              <span class="i-time">{{"{:,.2f}".format(event.timestamp_min)}}</span>
-            <span class="i-name">{{event.item_name}}</span></div>
+             <span class="i-name">{{event.item_name}}</span>
+             {% if event.type=='ITEM_SOLD'%}<span class="badge-sold">SOLD</span>{% endif %}
+             <div class="triangle"></div></div>
+            
         {% endif%}
     {% endfor %}
     </div>
     {% endfor %}
   {% endfor %}
 </div>
+
+<!-- SKILLS -->
+<div id="tab-skills" class="tab-panel">
+  {% for team_key, team_label, team_cls in [('blue', 'Blue Team', 'team-blue'), ('red', 'Red Team', 'team-red')] %}
+    {% for p in scoreboard[team_key] %}
+    <div class="card item-timeline" style="margin-bottom: 20px;width: auto;">
+      <div style="width: 100%; margin-bottom: 10px;">
+        <span class="p-item-name" style="margin-right: 5px;">{{p.champion_name}}</span>
+        <span class="badge {{ 'badge-blue' if p.team =='blue' else 'badge-loss' }}">{{ 'BLUE' if p.team=='blue' else 'RED' }}</span>
+      </div>
+      <div class="skill-wrapper">
+      <table class="skillgrid">
+  <tbody>
+    {% for s in range(4) %}
+    <tr>
+      {% for l in range(19) %}
+      <td>{{p.skills[s][l]}}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+    </div>
+    </div>
+    {% endfor %}
+    {% endfor %}
+</div>
+
+
 
 <script>
   const chartsData   = {{ charts|safe }};

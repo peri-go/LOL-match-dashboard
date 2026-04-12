@@ -3,6 +3,7 @@ import json
 import time
 import requests
 import pandas as pd
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import API_KEY
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
@@ -437,7 +438,7 @@ def build_timeline(match_id, region=None):
         for event in frame['events']:
             e_type = event.get('type', '')
             item_id = str(event.get('itemId'))
-            if e_type not in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL', 'ITEM_PURCHASED','ITEM_SOLD') or item_id not in items:
+            if e_type not in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL', 'ITEM_PURCHASED', 'ITEM_SOLD') or item_id not in items:
                 continue
             events.append({
                 'timestamp_min': timestamp_min,
@@ -454,8 +455,36 @@ def build_timeline(match_id, region=None):
                 'position_x':    event.get('position', {}).get('x'),
                 'position_y':    event.get('position', {}).get('y'),
             })
-    print(events)
     return events
+
+def build_skill_timeline(match_id, region=None):
+    tl = get_timeline(match_id, region)
+    if not tl:
+        raise ValueError(f'Could not fetch timeline for {match_id}')
+    events=[]
+    for frame in tl['info']['frames']:
+        for event in frame['events']:
+            e_type = event.get('type', '')
+            l_type = event.get('levelUpType', 'NORMAL')
+            if e_type != 'SKILL_LEVEL_UP' or l_type != 'NORMAL':
+                continue
+            events.append({
+                event.get('participantId'):event.get('skillSlot') 
+            })
+    df = pd.DataFrame([(k, v) for d in events for k, v in d.items()],
+                  columns=["key", "value"])
+    grouped = df.groupby("key")["value"].apply(list)
+    result = grouped.apply(skill_order)
+    return result.tolist()
+
+def skill_order(skill_tl):
+    skill_key = ['Q','W','E','R']
+    order = [['' for _ in range(len(skill_tl)+1)] for _ in range(5)]
+    for n in range(4):
+        order[n][0] = skill_key[n]
+    for j in range(len(skill_tl)):
+        order[skill_tl[j]-1][j+1] = j+1
+    return order
 
 def champion_map():
     c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)
@@ -562,14 +591,15 @@ def get_chart(df_players, col):
         'teams':     data['team_id'].tolist(),
     }
 
-def build_analysis(all_players_path, summoner_name=None):
+def build_analysis(all_players_path, skills,summoner_name=None):
     df_players = load_csvs(all_players_path)
     new_cols = pd.DataFrame({
     'key_icon': df_players['rune_keystone'].map(runes),
     'sub_icon': df_players['rune_sub_style'].map(runes),
     'spell_1': df_players['summoner1_id'].apply(spell_url),
     'spell_2': df_players['summoner2_id'].apply(spell_url),
-    'champion_icon': df_players['champion_name'].apply(champ_icon_url)
+    'champion_icon': df_players['champion_name'].apply(champ_icon_url),
+    'skills' : skills,
     })
     df_players = pd.concat([df_players, new_cols], axis=1)
     return {

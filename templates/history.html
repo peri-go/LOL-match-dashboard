@@ -24,11 +24,26 @@
 {% set wins   = history | selectattr('win') | list | length %}
 {% set total  = history | length %}
 {% set losses = total - wins %}
-
-<div class="stat-grid">
-  <div class="stat-card">
-    <div class="stat-card-value">{{ total }}</div>
-    <div class="stat-card-label">Games</div>
+{% set kills = ((history | sum(attribute='kills')) / (history | length)) | round | int %}
+{% set deaths = ((history | sum(attribute='deaths')) / (history | length)) | round | int %}
+{% set assists = ((history | sum(attribute='assists')) / (history | length)) | round | int %}
+{% set kda = (kills + assists) / deaths %}
+<div class="stat-grid" >
+  <div class="stat-card" style="display: flex;">
+    
+    <div class="donut" style="
+  background: conic-gradient(
+    var(--red) {{ ((losses / total) * 100) | round | int }}%,
+    var(--blue) {{ ((losses / total) * 100) | round | int }}% 100%
+  );"><span class="obj" style="position: absolute;top: 20px;right: 27%;z-index: 1;">{{ ((wins / total) * 100) | round | int }}%</span></div>
+    <div style="margin-left: auto;vertical-align: center;">
+      <div>{{ kills }} / {{ deaths }} / {{ assists }}</div>
+      <div style="color: {% if kda >= 3 %}var(--win){% elif kda >= 1.5 %}var(--muted){% else %}var(--loss){% endif %};">{{ "%.3g"|format(kda) }}</div>
+    </div>
+    <div style="margin-left: auto;vertical-align: center;">
+      <div class="stat-card-value">{{ total }}</div>
+      <div class="stat-card-label">Games</div>
+    </div>
   </div>
   <div class="stat-card" style="border-color: rgba(60,184,120,0.3);">
     <div class="stat-card-value" style="color: var(--win);">{{ wins }}</div>
