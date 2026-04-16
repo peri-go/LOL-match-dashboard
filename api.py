@@ -71,10 +71,10 @@ def save_cache(key, data):
 # ── http ──────────────────────────────────────────────────────────────────────
 
 def riot_get(url):
-    print(f'  GET ...{url.split("riotgames.com")[-1][:70]}')
+    # print(f'  GET ...{url.split("riotgames.com")[-1][:70]}')
     try:
         resp = requests.get(url, headers={'X-Riot-Token': API_KEY}, timeout=15)
-        print(f'  -> {resp.status_code}')
+        # print(f'  -> {resp.status_code}')
         if resp.status_code == 200:
             return resp.json()
         if resp.status_code == 401:
@@ -152,8 +152,8 @@ def get_match_history(puuid, runes, region=None,start= 0,count= 20):
         secondary = sub.get('style')
         row = {
             'match_id':     mid,
-            'champion':     me.get('championName', '?'),
-            'champion_icon': champ_icon_url(me.get('championName')),
+            'champion':     champ_name[str(me.get('championId'))],
+            'champion_icon': champ_id_icon(me.get('championId')),
             'position':     me.get('teamPosition') or me.get('individualPosition', ''),
             'queue':        QUEUE_NAMES.get(info.get('queueId'), 'Other'),
             'win':          me.get('win', False),
@@ -231,7 +231,7 @@ def build_all_players_csv(match_id, region=None):
     red_horde  = teams.get(200, {}).get('objectives', {}).get('horde', {})
     blue_horde_kills = blue_horde.get('kills', 0)
     red_horde_kills  = red_horde.get('kills', 0)
-
+    
     meta = {
         "match_id":     match.get("metadata",{}).get("matchId","?"),
         "patch":        info.get("gameVersion","?").rsplit(".",1)[0],
@@ -263,7 +263,7 @@ def build_all_players_csv(match_id, region=None):
             "win":                       p.get("win"),
             # champion
             "champion_id":               p.get("championId"),
-            "champion_name":             p.get("championName"),
+            "champion_name":             champ_name[str(p.get("championId"))],
             "champion_level":            p.get("champLevel"),
             "champion_xp":               p.get("champExperience"),
             "champion_transform":        p.get("championTransform"),
@@ -403,10 +403,9 @@ def build_all_players_csv(match_id, region=None):
         team_stats = {}
     for tid, tlabel in [(100,"blue"),(200,"red")]:
         tp  = [p for p in rows if p["team"]==tlabel]
-        bans= blue_bans if tlabel=="blue" else red_bans
-        map = champion_map()
-        result = [champ_id_icon(i,map) for i in bans]
-        icon,ban = zip(*result)
+        bans = blue_bans if tlabel=="blue" else red_bans
+        ban_icon = [champ_id_icon(i) for i in bans]
+        ban_name = ['None' if i == -1 else champ_name[str(i)] for i in bans ]
         team_stats[tlabel] = {
             "win":         bool(teams.get(tid,{}).get("win",False)),
             "kills":       sum(p["kills"]        for p in tp),
@@ -419,8 +418,8 @@ def build_all_players_csv(match_id, region=None):
             "towers":      sum(p['turret_kills'] for p in tp),
             "inhibitors":  sum(p['inhibitor_kills'] for p in tp),
             "voidgrubs":   blue_horde_kills if tlabel == "blue" else red_horde_kills,
-            "icons" :      icon,
-            "bans"  :      ban,
+            "icons" :      ban_icon,
+            "bans" :      ban_name,
         }
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     path = os.path.join(UPLOAD_DIR, f'{match_id}_all_players.csv')
@@ -466,33 +465,44 @@ def build_skill_timeline(match_id, region=None):
         for event in frame['events']:
             e_type = event.get('type', '')
             l_type = event.get('levelUpType', 'NORMAL')
-            if e_type != 'SKILL_LEVEL_UP' or l_type != 'NORMAL':
+            pid = event.get('participantId')
+            if e_type != 'SKILL_LEVEL_UP' or l_type != 'NORMAL' or pid == 0:
                 continue
             events.append({
                 event.get('participantId'):event.get('skillSlot') 
             })
+    full_range = set(range(1,11))
+    existing ={list(d.keys())[0] for d in events}
+    missing = full_range - existing
+    for m in missing:
+        events.append({m: 0})
     df = pd.DataFrame([(k, v) for d in events for k, v in d.items()],
                   columns=["key", "value"])
     grouped = df.groupby("key")["value"].apply(list)
+    print(grouped[6])
     result = grouped.apply(skill_order)
     return result.tolist()
 
 def skill_order(skill_tl):
     skill_key = ['Q','W','E','R']
-    order = [['' for _ in range(len(skill_tl)+1)] for _ in range(5)]
+    order = [['' for _ in range(len(skill_tl)+1)] for _ in range(4)]
     for n in range(4):
         order[n][0] = skill_key[n]
     for j in range(len(skill_tl)):
+        if skill_tl[j] == 0:
+            continue
         order[skill_tl[j]-1][j+1] = j+1
     return order
 
 def champion_map():
     c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)
     m = c.json()
-    map={}
+    id={}
+    name={}
     for i in m['data']:
-        map[m['data'][i]['key']] = m['data'][i]['id']
-    return map
+        id[m['data'][i]['key']] = m['data'][i]['id']
+        name[m['data'][i]['key']] = m['data'][i]['name']
+    return id,name
 
 def filter_item(item):
     tags = item.get("tags", [])
@@ -523,23 +533,22 @@ def item_url(item_id):
         return None
     return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/item/{int(item_id)}.png'
 
-def champ_id_icon(id, map):
+def champ_id_icon(id):
     if id == -1:
-        return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/profileicon/29.png','None'
+        return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/profileicon/29.png'
     else:
-        champ = map[str(id)]
+        champ = champ_id[str(id)]
         url = champ_icon_url(champ)
-        return url,champ
+        return url
 
-def champ_icon_url(champ_name):
-    name = (champ_name or 'Ahri').replace(' ', '').replace("'", '').replace('.', '')
-    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/champion/{name}.png'
+def champ_icon_url(champion_name):
+    return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/champion/{champion_name}.png'
 
 def spell_url(id):
     spell = SUMMONER_SPELLS.get(id)
     return f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/img/spell/{spell}.png'
 
-def get_rune_paths():
+def rune_map():
     try: 
         r = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/runesReforged.json', timeout=5)
         runes = r.json()
@@ -554,8 +563,9 @@ def get_rune_paths():
     except:
         return None
     
-runes = get_rune_paths()  
+runes = rune_map()  
 items = item_map()
+champ_id,champ_name = champion_map()
 
 def load_csvs(all_players_path):
     df_players  = pd.read_csv(all_players_path)
@@ -598,7 +608,7 @@ def build_analysis(all_players_path, skills,summoner_name=None):
     'sub_icon': df_players['rune_sub_style'].map(runes),
     'spell_1': df_players['summoner1_id'].apply(spell_url),
     'spell_2': df_players['summoner2_id'].apply(spell_url),
-    'champion_icon': df_players['champion_name'].apply(champ_icon_url),
+    'champion_icon': df_players['champion_id'].apply(champ_id_icon),
     'skills' : skills,
     })
     df_players = pd.concat([df_players, new_cols], axis=1)

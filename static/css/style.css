@@ -248,12 +248,22 @@
   background: var(--bg2);
 }
 
-.skillgrid td:not(:empty) {
+.skillgrid td:not(:empty).color-blue {
   background-color: var(--blue-glow);
   cursor: pointer;
 }
-.skillgrid td:first-child {
+
+.skillgrid td:not(:empty).color-red {
+  background-color: var(--red-glow);
+  cursor: pointer;
+}
+
+.skillgrid td:first-child.color-blue {
   background-color: var(--blue-dim);
+}
+
+.skillgrid td:first-child.color-red {
+  background-color: var(--red-dim);
 }
 
 .donut {
@@ -276,3 +286,20 @@
   border-radius: 50%;
   transform: translate(-50%, -50%);
 }
+
+.loading__anim {
+            width: 35px;
+            height: 35px;
+            border:  5px solid rgba(189,189,189 ,0.25);
+            border-left-color: var(--blue);
+            border-top-color: var(--blue);
+            border-radius: 50%;
+            display: inline-block;
+            animation: rotate 600ms infinite linear;
+            }
+
+            @keyframes rotate {
+            to {
+                transform: rotate(1turn)
+            }
+            }

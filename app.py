@@ -9,7 +9,7 @@ app.secret_key = 'lol-analyzer-secret'
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
-runes = api.get_rune_paths()
+runes = api.rune_map()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -49,14 +49,11 @@ def match_history():
 @app.route('/history/load')
 def history_load():
     puuid  = session.get('puuid')
-    runes  = session.get('runes')
     region = session.get('region', 'BR')
     page   = int(request.args.get('page', 0))
     per_page = 10
-
-    ids     = api.riot_get(puuid, region, start=page * per_page, count=per_page)
-    matches = api.build_match_history(puuid, runes, ids, region)
-    return jsonify({'matches': matches, 'done': len(matches) < per_page})
+    matches = api.get_match_history(puuid, runes, region, page * per_page, per_page)
+    return render_template("history_rows.html", history=matches)
 
 @app.route('/select_match/<match_id>')
 def select_match(match_id):
@@ -91,8 +88,7 @@ def analysis_page():
         charts=json.dumps(data['charts']),
         summoner=summoner_name,
         match= match,
-        timeline= timeline,
-        skills = skills)
+        timeline= timeline)
 
 @app.route('/search/<summoner_name>/<tagline>')
 def search_summoner(summoner_name, tagline):

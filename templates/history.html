@@ -60,7 +60,7 @@
 </div>
 
 <div class="card" style="padding: 1px; overflow: hidden;">
-  <table>
+  <table id="history-table">
     <thead>
       <tr>
         <th>Result</th>
@@ -126,5 +126,86 @@
   No matches found.
 </div>
 {% endif %}
+
+<div id="sentinel" style="height: 20px;"></div>
+<div id="loading-indicator" style="display: none;justify-content: center;"><span class="loading__anim"></span></div>
+<script>
+let page = 2;
+let loading = false;
+let done = false;
+const loadingIndicator = document.getElementById("loading-indicator");
+
+async function loadMore() {
+  if (loading || done) return;
+  
+  loading = true;
+
+  if (loadingIndicator) loadingIndicator.style.display = "flex";
+
+  console.log("loading page", page);
+
+  try {
+    const res = await fetch(`/history/load?page=${page}`);
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Server error:", text);
+      loading = false;
+      return;
+    }
+
+    const html = await res.text();
+    const tbody = document.querySelector("#history-table tbody");
+
+    if (!tbody) {
+      console.error("tbody not found!");
+      loading = false;
+  if (loadingIndicator) loadingIndicator.style.display = "none";
+      return;
+    }
+
+  
+    tbody.insertAdjacentHTML("beforeend", html);
+
+  
+    if (html.trim().length === 0) {
+      done = true;
+    }
+
+    page++;
+
+  } catch (err) {
+    console.error("fetch failed:", err);
+  }
+
+  loading = false;
+}
+
+
+const sentinel = document.createElement("div");
+sentinel.id = "scroll-sentinel";
+sentinel.style.height = "1px";
+document.body.appendChild(sentinel);
+
+const observer = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting) {
+    loadMore();
+  }
+});
+
+
+window.addEventListener("DOMContentLoaded", () => {
+  const tbody = document.querySelector("#history-table tbody");
+
+  if (!tbody) {
+    console.error("Table not found on DOM load");
+    return;
+  }
+
+  observer.observe(sentinel);
+
+  loadMore();
+});
+</script>
 
 {% endblock %}

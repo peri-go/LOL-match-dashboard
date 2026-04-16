@@ -215,7 +215,6 @@
              style="width: 32px; height: 32px; border-radius: 3px;"
              title="{{event.item_name}}" onerror="this.style.display='none'">
              <span class="i-time">{{"{:,.2f}".format(event.timestamp_min)}}</span>
-             <span class="i-name">{{event.item_name}}</span>
              {% if event.type=='ITEM_SOLD'%}<span class="badge-sold">SOLD</span>{% endif %}
              <div class="triangle"></div></div>
             
@@ -233,15 +232,14 @@
     <div class="card item-timeline" style="margin-bottom: 20px;width: auto;">
       <div style="width: 100%; margin-bottom: 10px;">
         <span class="p-item-name" style="margin-right: 5px;">{{p.champion_name}}</span>
-        <span class="badge {{ 'badge-blue' if p.team =='blue' else 'badge-loss' }}">{{ 'BLUE' if p.team=='blue' else 'RED' }}</span>
       </div>
       <div class="skill-wrapper">
       <table class="skillgrid">
   <tbody>
     {% for s in range(4) %}
     <tr>
-      {% for l in range(19) %}
-      <td>{{p.skills[s][l]}}</td>
+      {% for l in range([19, p.skills[s]|length] | max) %}
+      <td class="{{ 'color-blue' if p.team =='blue' else 'color-red' }}">{{p.skills[s][l]}}</td>
       {% endfor %}
     </tr>
     {% endfor %}
