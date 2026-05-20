@@ -119,8 +119,8 @@
                 </div></div>
           </div>
           </td>
-          <td><img src="{{ p.key_icon }}" class="rune-key"><img src="{{ p.sub_icon }}" class="rune-sec"></td>
-          <td><img src="{{p.spell_1}}" class="spell"><img src="{{p.spell_2}}" class="spell"></td>
+          <td><img src="{{ p.key_icon }}" title="{{p.key_name}}" class="rune-key"><img src="{{ p.sub_icon }}" title="{{p.sub_name}}" class="rune-sec"></td>
+          <td><img src="{{p.spell_1_icon}}" title="{{p.spell_1}}" class="spell"><img src="{{p.spell_2_icon}}" title="{{p.spell_2}}" class="spell"></td>
           <td class="mono">
             <div style="margin-left: 20px; color: {% if p.kda >= 3 %}var(--win){% elif p.kda >= 1.5 %}var(--text){% else %}var(--loss){% endif %};">{{ p.kda }}</div>
 

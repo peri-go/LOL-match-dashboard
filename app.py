@@ -1,15 +1,14 @@
 import os
 import json
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
-from werkzeug.utils import secure_filename
 import api
+from config import SECRET_KEY
 
 app = Flask(__name__)
-app.secret_key = 'lol-analyzer-secret'
+app.secret_key = SECRET_KEY
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
-runes = api.rune_map()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -40,7 +39,7 @@ def match_history():
 
     region = session.get('region', 'BR')
     try:
-        history = api.get_match_history(puuid, runes, region)
+        history = api.get_match_history(puuid, region)
     except Exception as e:
         return render_template('history.html', error=str(e), history=[], summoner=summoner_name)
 
@@ -52,7 +51,7 @@ def history_load():
     region = session.get('region', 'BR')
     page   = int(request.args.get('page', 0))
     per_page = 10
-    matches = api.get_match_history(puuid, runes, region, page * per_page, per_page)
+    matches = api.get_match_history(puuid, region, page * per_page, per_page)
     return render_template("history_rows.html", history=matches)
 
 @app.route('/select_match/<match_id>')

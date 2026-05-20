@@ -21,12 +21,13 @@
 
 {% if history %}
 
-{% set wins   = history | selectattr('win') | list | length %}
-{% set total  = history | length %}
+{% set filtered = history | selectattr('duration_m', 'ge', 5) | list %}
+{% set wins   = filtered | selectattr('win') | list | length %}
+{% set total  = filtered | length %}
 {% set losses = total - wins %}
-{% set kills = ((history | sum(attribute='kills')) / (history | length)) | round | int %}
-{% set deaths = ((history | sum(attribute='deaths')) / (history | length)) | round | int %}
-{% set assists = ((history | sum(attribute='assists')) / (history | length)) | round | int %}
+{% set kills = ((filtered | sum(attribute='kills')) / (filtered | length)) | round(1) %}
+{% set deaths = ((filtered | sum(attribute='deaths')) / (filtered | length)) | round(1) %}
+{% set assists = ((filtered | sum(attribute='assists')) / (filtered | length)) | round(1) %}
 {% set kda = (kills + assists) / deaths %}
 <div class="stat-grid" >
   <div class="stat-card" style="display: flex;">
@@ -77,46 +78,7 @@
       </tr>
     </thead>
     <tbody>
-      {% for m in history %}
-      <tr style="border-left: 3px solid {{ 'var(--grey)' if m.duration_m < 5 else 'var(--green-dim)' if m.win else 'var(--red-dim)' }};" onclick="window.location.href='/select_match/{{ m.match_id }}'">
-        <td><span class="badge {{ 'badge-remake' if m.duration_m < 5 else 'badge-win' if m.win else 'badge-loss' }}">{{ 'Remake' if m.duration_m < 5 else 'Victory' if m.win else 'Defeat' }}</span></td>
-        <td style="max-width: 140px;">
-          <div class="champ-cell">
-            <div style="position: relative; width: 35px; height: 35px; bottom: 5px; flex-shrink: 0;">
-  <img src="{{ m.champion_icon }}" title="{{ m.champion }}" class="history-icon" onerror="this.style.display='none'">
-  <span style="position: absolute; bottom: -10px; right: -9px; font-size: 9px; font-weight: 600;
-               background: var(--bg); color: var(--text); line-height: 1;
-               padding: 1px 3px; border-radius: 3px;">{{ m.level }}</span>
-</div>
-            <span style="font-weight: 500; margin-left: 18px; position: relative; vertical-align: auto;">{{ m.champion }}</span>
-          </div>
-          <td style="width: 100px;"><img src="{{m.spell_1}}" class="spell"><img src="{{m.spell_2}}" class="spell"></td>
-        </td>
-        <td><img src="{{ m.keystone }}" class="rune-key"><img src="{{ m.secondary }}" class="rune-sec"></td>
-        <td><div style="display: grid; grid-template-columns: repeat(4, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
-            {% for item in m.item %}
-              {% if item %}
-                <img src="https://ddragon.leagueoflegends.com/cdn/16.7.1/img/item/{{ item }}.png"
-                    style="width: 24px; height: 24px; border-radius: 3px;"
-                    onerror="this.style.display='none'">
-              {% else %}
-                <div style="width: 24px; height: 24px; background: var(--bg); border-radius: 3px;"></div>
-              {% endif %}
-            {% endfor %}
-          </div>
-          
-        </td>
-        <td class="kda">
-          <div><span class="kda-k">{{ m.kills }}</span><span style="color:var(--muted2);">/</span><span class="kda-d">{{ m.deaths }}</span><span style="color:var(--muted2);">/</span><span class="kda-a">{{ m.assists }}</span></div>
-          <span style="margin:auto;color: {% if m.kda >= 3 %}var(--win){% elif m.kda >= 1.5 %}var(--text){% else %}var(--loss){% endif %};">{{ m.kda }}</span>
-        </td>
-        <td class="mono">{{ m.cs }}</td>
-        <td class="mono">{{ '{:,}'.format(m.damage) }}</td>
-        <td class="mono" style="color: var(--muted);">{{ m.duration_m }}m {{ m.duration_s }}s</td>
-        <td style="color: var(--muted);">{{ m.queue }}</td>
-        <td style="color: var(--muted2); font-size: 12px;">{{ m.patch }}</td>
-      </tr>
-      {% endfor %}
+      {% include "history_rows.html" %}
     </tbody>
   </table>
 </div>
@@ -204,7 +166,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   observer.observe(sentinel);
 
-  loadMore();
 });
 </script>
 

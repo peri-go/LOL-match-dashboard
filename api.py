@@ -3,7 +3,7 @@ import json
 import time
 import requests
 import pandas as pd
-from collections import defaultdict
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import API_KEY
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
@@ -36,6 +36,20 @@ SUMMONER_SPELLS = {
     14: 'SummonerDot',
     21: 'SummonerBarrier',
     32: 'SummonerSnowball',
+}
+
+SPELLS_NAMES = {
+    1:  'Cleanse',
+    3:  'Exhaust',
+    4:  'Flash',
+    6:  'Ghost',
+    7:  'Heal',
+    11: 'Smite',
+    12: 'Teleport',
+    13: 'Clarity',
+    14: 'Ignite',
+    21: 'Barrier',
+    32: 'Snowball',
 }
 
 _DDRAGON_VERSION = None
@@ -118,7 +132,7 @@ def get_puuid(name, tagline=''):
 
 # ── match list ────────────────────────────────────────────────────────────────
 
-def get_match_history(puuid, runes, region=None,start= 0,count= 20):
+def get_match_history(puuid, region=None,start= 0,count= 20):
     region    = (region).upper()
     continent = CONTINENTAL.get(region, 'americas')
 
@@ -147,6 +161,7 @@ def get_match_history(puuid, runes, region=None,start= 0,count= 20):
         sub       = styles[1] if len(styles) > 1 else {}
         pri_sel   = pri.get('selections', [{}])
         dur       = max(info.get('gameDuration', 1), 1)
+        date      = info.get('gameCreation')
         kda       = (me['kills'] + me['assists']) / max(me['deaths'], 1)
         keystone  = pri_sel[0].get('perk') if pri_sel else None
         secondary = sub.get('style')
@@ -165,12 +180,17 @@ def get_match_history(puuid, runes, region=None,start= 0,count= 20):
             'cs':           me.get('totalMinionsKilled', 0),
             'duration_m':   dur // 60,
             'duration_s':   dur % 60,
+            'date':         time_ago(date),
             'patch':        info.get('gameVersion', '').rsplit('.', 1)[0],
             'level':        me.get('champLevel', 0),
             'spell_1':      spell_url(me.get('summoner1Id', 0)),
             'spell_2':      spell_url(me.get('summoner2Id', 0)),
-            'keystone':     runes.get(keystone),
-            'secondary':    runes.get(secondary),
+            'spell_1_name': SPELLS_NAMES.get(me.get('summoner1Id', 0)),
+            'spell_2_name': SPELLS_NAMES.get(me.get('summoner2Id', 0)),
+            'keystone_icon':     runes.get(keystone),
+            'secondary_icon':    runes.get(secondary),
+            'keystone':     rune_names.get(keystone),
+            'secondary':    rune_names.get(secondary),
             'item':         [me.get(f'item{i}') for i in range(6)],
         }
         row['item'].insert(3, me.get('item6'))
@@ -188,6 +208,30 @@ def get_match_history(puuid, runes, region=None,start= 0,count= 20):
     id_order = {mid: i for i, mid in enumerate(ids)}
     rows.sort(key=lambda r: id_order.get(r['match_id'], 0))
     return rows
+
+def time_ago(creationTime):
+    created = datetime.fromtimestamp(creationTime / 1000)
+
+    now = datetime.now()
+    diff = now - created
+
+    seconds = int(diff.total_seconds())
+
+    intervals = [
+        ("year", 31536000),
+        ("month", 2592000),
+        ("day", 86400),
+        ("hour", 3600),
+        ("minute", 60),
+        ("second", 1),
+    ]
+
+    for name, count in intervals:
+        value = seconds // count
+        if value:
+            return f"{value} {name}{'s' if value > 1 else ''} ago"
+
+    return "just now"
 
 # ── full match fetch + CSV build ──────────────────────────────────────────────
 
@@ -554,16 +598,19 @@ def rune_map():
         runes = r.json()
         base = "https://ddragon.leagueoflegends.com/cdn/img/"
         rune_icons = {}
+        rune_names = {}
         for tree in runes:
             rune_icons[tree['id']] = base + tree['icon']
+            rune_names[tree['id']] = tree['name']
             for slot in tree["slots"]:
                 for rune in slot["runes"]:
                     rune_icons[rune['id']] = base + rune['icon']
-        return rune_icons
+                    rune_names[rune['id']] = rune['name']
+        return rune_icons,rune_names
     except:
         return None
     
-runes = rune_map()  
+runes,rune_names = rune_map()  
 items = item_map()
 champ_id,champ_name = champion_map()
 
@@ -606,8 +653,12 @@ def build_analysis(all_players_path, skills,summoner_name=None):
     new_cols = pd.DataFrame({
     'key_icon': df_players['rune_keystone'].map(runes),
     'sub_icon': df_players['rune_sub_style'].map(runes),
-    'spell_1': df_players['summoner1_id'].apply(spell_url),
-    'spell_2': df_players['summoner2_id'].apply(spell_url),
+    'key_name': df_players['rune_keystone'].map(rune_names),
+    'sub_name': df_players['rune_sub_style'].map(rune_names),
+    'spell_1_icon': df_players['summoner1_id'].apply(spell_url),
+    'spell_2_icon': df_players['summoner2_id'].apply(spell_url),
+    'spell_1' : df_players['summoner1_id'].map(SPELLS_NAMES),
+    'spell_2' : df_players['summoner2_id'].map(SPELLS_NAMES),
     'champion_icon': df_players['champion_id'].apply(champ_id_icon),
     'skills' : skills,
     })

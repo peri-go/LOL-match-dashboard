@@ -11,9 +11,9 @@
 </div>
             <span style="font-weight: 500; margin-left: 18px; position: relative; vertical-align: auto;">{{ m.champion }}</span>
           </div>
-          <td style="width: 100px;"><img src="{{m.spell_1}}" class="spell"><img src="{{m.spell_2}}" class="spell"></td>
+          <td style="width: 100px;"><img src="{{m.spell_1}}" title="{{m.spell_1_name}}" class="spell"><img src="{{m.spell_2}}" title="{{m.spell_2_name}}" class="spell"></td>
         </td>
-        <td><img src="{{ m.keystone }}" class="rune-key"><img src="{{ m.secondary }}" class="rune-sec"></td>
+        <td><img src="{{ m.keystone_icon }}" title="{{m.keystone}}" class="rune-key"><img src="{{ m.secondary_icon }}" title="{{m.secondary}}" class="rune-sec"></td>
         <td><div style="display: grid; grid-template-columns: repeat(4, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
             {% for item in m.item %}
               {% if item %}
@@ -24,7 +24,7 @@
                 <div style="width: 24px; height: 24px; background: var(--bg); border-radius: 3px;"></div>
               {% endif %}
             {% endfor %}
-          </div>
+            </div>
           
         </td>
         <td class="kda">
@@ -34,7 +34,7 @@
         <td class="mono">{{ m.cs }}</td>
         <td class="mono">{{ '{:,}'.format(m.damage) }}</td>
         <td class="mono" style="color: var(--muted);">{{ m.duration_m }}m {{ m.duration_s }}s</td>
-        <td style="color: var(--muted);">{{ m.queue }}</td>
+        <td style="color: var(--muted);"><div>{{ m.queue }}</div><div style="color: var(--muted2)">{{m.date}}</div></td>
         <td style="color: var(--muted2); font-size: 12px;">{{ m.patch }}</td>
       </tr>
       {% endfor %}
