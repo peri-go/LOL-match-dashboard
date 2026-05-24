@@ -6,6 +6,7 @@ import pandas as pd
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import API_KEY
+
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 
@@ -14,11 +15,13 @@ CONTINENTAL = {
     'EUW': 'europe',  'EUNE': 'europe',  'TR': 'europe',   'RU': 'europe',
     'KR': 'asia',     'JP': 'asia',      'OCE': 'sea',
 }
+
 LOL_REGIONAL = {
     'NA': 'na1', 'BR': 'br1', 'LAN': 'la1', 'LAS': 'la2',
     'EUW': 'euw1', 'EUNE': 'eun1', 'TR': 'tr1', 'RU': 'ru',
     'KR': 'kr',  'JP': 'jp1', 'OCE': 'oc1',
 }
+
 QUEUE_NAMES = {
     420: 'Ranked Solo', 440: 'Ranked Flex', 450: 'ARAM',
     400: 'Normal Draft', 430: 'Normal Blind', 900: 'URF',
@@ -65,8 +68,6 @@ def get_ddragon_version():
         _DDRAGON_VERSION = '16.7.1'
     return _DDRAGON_VERSION
 
-# ── cache helpers ─────────────────────────────────────────────────────────────
-
 def cache_path(key):
     return os.path.join(CACHE_DIR, f'{key}.json')
 
@@ -81,8 +82,6 @@ def save_cache(key, data):
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(cache_path(key), 'w') as f:
         json.dump(data, f, indent=2)
-
-# ── http ──────────────────────────────────────────────────────────────────────
 
 def riot_get(url):
     # print(f'  GET ...{url.split("riotgames.com")[-1][:70]}')
@@ -108,13 +107,8 @@ def riot_get(url):
         print(f'  Error: {e}')
         return None
 
-# ── account ───────────────────────────────────────────────────────────────────
-
 def get_puuid(name, tagline=''):
-    """
-    Accepts 'Name#TAG' as a single string, or name + tagline separately.
-    Returns (puuid, display_name).
-    """
+
     if '#' in name and not tagline:
         name, tagline = name.split('#', 1)
 
@@ -129,8 +123,6 @@ def get_puuid(name, tagline=''):
             return d['puuid'], display
 
     raise ValueError(f'Could not find account: {name}#{tagline}')
-
-# ── match list ────────────────────────────────────────────────────────────────
 
 def get_match_history(puuid, region=None,start= 0,count= 20):
     region    = (region).upper()
@@ -233,8 +225,6 @@ def time_ago(creationTime):
 
     return "just now"
 
-# ── full match fetch + CSV build ──────────────────────────────────────────────
-
 def get_match(match_id, region=None):
     region    = (region).upper()
     continent = CONTINENTAL.get(region, 'americas')
@@ -284,8 +274,8 @@ def build_all_players_csv(match_id, region=None):
         "duration_str": f"{dur//60}:{dur%60:02d}",
         "game_start":   info.get("gameStartTimestamp",""),
         "source":       "api",
+        "gold_diff":    get_gold_diff(match_id,region)
     }
-
     participants = match['info']['participants']
     rows = []
     for p in participants:
@@ -470,6 +460,28 @@ def build_all_players_csv(match_id, region=None):
     pd.DataFrame(rows).to_csv(path, index=False)
     return path,{'meta': meta, 'team_stats' : team_stats}
 
+def get_gold_diff(match_id, region=None):
+    tl = get_timeline(match_id, region)
+    if not tl:
+        raise ValueError(f'Could not fetch timeline for {match_id}')
+    
+    gold_diff = []
+    
+    for frame in tl['info']['frames']:
+        timestamp_min = frame['timestamp'] / 60000 if len(tl['info']['frames']) == len(gold_diff)+1 else frame['timestamp'] // 60000
+        participant_frames = frame["participantFrames"]
+        bluegold = 0
+        redgold = 0
+        for pid, pf in participant_frames.items():
+            if int(pid) <= 5:
+                bluegold += pf["totalGold"]
+            else:
+                redgold += pf["totalGold"]
+            diff= bluegold-redgold
+
+        gold_diff.append({f"{timestamp_min:.2f}" : diff})
+    return gold_diff
+
 def build_timeline(match_id, region=None):
     tl = get_timeline(match_id, region)
     if not tl:
@@ -523,7 +535,6 @@ def build_skill_timeline(match_id, region=None):
     df = pd.DataFrame([(k, v) for d in events for k, v in d.items()],
                   columns=["key", "value"])
     grouped = df.groupby("key")["value"].apply(list)
-    print(grouped[6])
     result = grouped.apply(skill_order)
     return result.tolist()
 
@@ -536,6 +547,19 @@ def skill_order(skill_tl):
         if skill_tl[j] == 0:
             continue
         order[skill_tl[j]-1][j+1] = j+1
+    pairs = [
+    (
+        lst[0],
+        next(x for x in reversed(lst) if isinstance(x, (int, float)))
+    )
+    for lst in order[:3]
+    ]
+    total_levels = []
+    for lst in order[:3]:
+        mylist = [x for x in lst if isinstance(x, (int, float))]
+        total_levels.append((lst[0],len(mylist)))
+    sorted_skills = [skill.lower() for skill, level in sorted(pairs, key=lambda x: x[1])]
+    order.append(sorted_skills)
     return order
 
 def champion_map():

@@ -25,7 +25,7 @@
   <button class="tab-btn" onclick="switchTab('charts', this)">Charts</button>
   <button class="tab-btn" onclick="switchTab('builds', this)">Builds</button>
   <button class="tab-btn" onclick="switchTab('skills', this)">Skills</button>
-  <!-- <button class="tab-btn" onclick="switchTab('timeline', this)">Timeline</button> -->
+  <button class="tab-btn" onclick="switchTab('timeline', this)">Gold Diff</button>
 </div>
 
 <!-- ── SCOREBOARD ─────────────────────────────────────────────────────────── -->
@@ -184,20 +184,11 @@
 </div>
 
 <!-- ── TIMELINE ───────────────────────────────────────────────────────────── -->
-<!-- <div id="tab-timeline" class="tab-panel">
+<div id="tab-timeline" class="tab-panel">
   <div class="card" style="margin-bottom: 20px;">
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-      <div class="section-title" style="margin-bottom: 0;">Minute</div>
-      <span id="minute-label" style="font-family: var(--mono); font-size: 22px; font-weight: 600; color: var(--blue);">0</span>
-    </div>
-    <input type="range" id="timeline-slider" min="0" value="0">
-    <div style="display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--muted2); font-family: var(--mono);">
-      <span id="tl-min-label">0</span>
-      <span id="tl-max-label">0</span>
-    </div>
+      <canvas id="goldDiff"></canvas>
   </div>
-  <div id="timeline-events" style="display: flex; flex-direction: column; gap: 4px; max-height: 520px; overflow-y: auto;"></div>
-</div> -->
+</div>
 
 <!-- ── BUILDS ───────────────────────────────────────────────────────────── -->
 <div id="tab-builds" class="tab-panel">
@@ -245,6 +236,18 @@
     {% endfor %}
   </tbody>
 </table>
+    </div>
+    <div style="display: flex; align-items: center;">
+      {% for n in range(3) %}
+      <div style="margin-left: 50px;">
+
+      <img src="https://cdn.communitydragon.org/latest/champion/{{p.champion_id}}/ability-icon/{{p.skills[4][n]}}"
+             style="width: 64px; height: 64px; border-radius: 12px;margin-right: 10px;"
+             onerror="this.style.display='none'">
+      <span style="display: block;text-align: center; font-weight: 600;width: 64px;">{{p.skills[4][n].upper()}}</span>
+
+      </div>
+      {% endfor %}
     </div>
     </div>
     {% endfor %}
@@ -313,6 +316,159 @@
   });
 });
 
+const goldValues = {{ match.meta.gold_diff | tojson }};
+
+const points = goldValues.map(o => {
+  const k = Object.keys(o)[0];
+  return { x: parseFloat(k), y: o[k] };
+});
+
+// build final continuous dataset (no nulls)
+const segments = [];
+
+for (let i = 0; i < points.length - 1; i++) {
+
+  const p1 = points[i];
+  const p2 = points[i + 1];
+
+  const y1 = p1.y;
+  const y2 = p2.y;
+
+  // same sign
+  if ((y1 >= 0 && y2 >= 0) || (y1 < 0 && y2 < 0)) {
+
+    segments.push({
+      points: [p1, p2]
+    });
+
+    continue;
+  }
+
+  // zero crossing
+  const t = (0 - y1) / (y2 - y1);
+
+  const cross = {
+    x: p1.x + (p2.x - p1.x) * t,
+    y: 0
+  };
+
+  if (y1 >= 0) {
+    segments.push({ points: [p1, cross] });
+    segments.push({ points: [cross, p2] });
+  } else {
+    segments.push({ points: [p1, cross] });
+    segments.push({ points: [cross, p2] });
+  }
+}
+
+// flatten
+const data = segments.flatMap(s => s.points);
+
+// zero line plugin (always on top)
+const zeroLinePlugin = {
+  id: 'zeroLine',
+  afterDraw(chart) {
+
+    const { ctx, chartArea, scales: { y } } = chart;
+
+    const y0 = y.getPixelForValue(0);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(chartArea.left, y0);
+    ctx.lineTo(chartArea.right, y0);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#7878a8';
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+new Chart(
+  document.getElementById('goldDiff'),
+  {
+    type: 'line',
+
+    data: {
+      datasets: [
+        {
+          data,
+
+          parsing: false,
+
+          pointRadius: 0,
+          tension: 0.4,
+          borderWidth: 1,
+
+          // border color per segment
+          segment: {
+            borderColor: ctx => {
+              const y1 = ctx.p0.parsed.y;
+              const y2 = ctx.p1.parsed.y;
+
+              return (y1 >= 0 && y2 >= 0)
+                ? '#5383e8'
+                : '#e84057';
+            },
+
+            // fill color per segment (FIXED)
+            backgroundColor: ctx => {
+              const y1 = ctx.p0.parsed.y;
+              const y2 = ctx.p1.parsed.y;
+
+              const avg = (y1 + y2) / 2;
+
+              return avg >= 0
+                ? 'rgba(83,131,232,0.25)'
+                : 'rgba(232,64,87,0.25)';
+            }
+          },
+
+          fill: 'origin'
+        }
+      ]
+    },
+
+    options: {
+      responsive: true,
+      animation: false,
+      plugins: {
+        legend: { display: false }
+      },
+
+      scales: {
+        x: {
+          type: 'linear',
+          bounds: 'data',
+          ticks: {
+            stepSize: 2,
+            color: '#7878a8',
+            font: {
+              family: "'Sora', sans-serif",
+              size: 12
+            }
+          }
+        },
+
+        y: {
+          ticks: {
+            color: '#7878a8',
+            font: {
+              family: "'Sora', sans-serif",
+              size: 12
+            }
+          },
+
+          grid: {
+            color: '#2a2a2a'
+          }
+        }
+      }
+    },
+
+    plugins: [zeroLinePlugin]
+  }
+);
 
 </script>
 {% endblock %}

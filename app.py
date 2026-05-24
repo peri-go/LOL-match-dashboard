@@ -2,13 +2,14 @@ import os
 import json
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import api
-from config import SECRET_KEY
+from config import SECRET_KEY,SUMMONER,TAG
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
+
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -28,7 +29,7 @@ def index():
             except Exception as e:
                 error = f'Could not find summoner: {e}'
 
-    return render_template('index.html', error=error,regions = REGIONS)
+    return render_template('index.html', error=error,regions = REGIONS,summoner = SUMMONER,tag=TAG)
 
 @app.route('/history')
 def match_history():
