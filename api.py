@@ -535,7 +535,9 @@ def build_skill_timeline(match_id, region=None):
     df = pd.DataFrame([(k, v) for d in events for k, v in d.items()],
                   columns=["key", "value"])
     grouped = df.groupby("key")["value"].apply(list)
-    result = grouped.apply(skill_order)
+    max_order = grouped.apply(get_max_order)
+    ordered = grouped.apply(skill_order)
+    result = ordered + max_order.apply(lambda x: [x])
     return result.tolist()
 
 def skill_order(skill_tl):
@@ -547,20 +549,23 @@ def skill_order(skill_tl):
         if skill_tl[j] == 0:
             continue
         order[skill_tl[j]-1][j+1] = j+1
-    pairs = [
-    (
-        lst[0],
-        next(x for x in reversed(lst) if isinstance(x, (int, float)))
-    )
-    for lst in order[:3]
-    ]
-    total_levels = []
-    for lst in order[:3]:
-        mylist = [x for x in lst if isinstance(x, (int, float))]
-        total_levels.append((lst[0],len(mylist)))
-    sorted_skills = [skill.lower() for skill, level in sorted(pairs, key=lambda x: x[1])]
-    order.append(sorted_skills)
     return order
+
+def get_max_order(skill_order: list[int]) -> list[int]:
+    MAX_LEVEL = 5
+    skill_counts = {}
+    max_order = []
+    skill_map = {1: 'q', 2: 'w', 3: 'e', 4: 'r'}
+    for skill in skill_order:
+        skill_counts[skill] = skill_counts.get(skill, 0) + 1
+        if skill_counts[skill] == MAX_LEVEL:
+            max_order.append(skill)
+
+    not_maxed = {k: v for k, v in skill_counts.items() if k not in max_order and k != 4}
+    max_order += sorted(not_maxed, key=lambda k: not_maxed[k], reverse=True)
+
+    result = [skill_map[i] for i in max_order]
+    return result
 
 def champion_map():
     c = requests.get(f'https://ddragon.leagueoflegends.com/cdn/{get_ddragon_version()}/data/en_US/champion.json', timeout= 5)

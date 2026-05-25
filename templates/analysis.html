@@ -186,6 +186,7 @@
 <!-- ── TIMELINE ───────────────────────────────────────────────────────────── -->
 <div id="tab-timeline" class="tab-panel">
   <div class="card" style="margin-bottom: 20px;">
+    <div class="chart-title">Gold</div>
       <canvas id="goldDiff"></canvas>
   </div>
 </div>
@@ -398,7 +399,7 @@ new Chart(
 
           pointRadius: 0,
           tension: 0.4,
-          borderWidth: 1,
+          borderWidth: 2,
 
           // border color per segment
           segment: {
@@ -430,14 +431,39 @@ new Chart(
     },
 
     options: {
+      
       responsive: true,
-      animation: false,
+      animations: {
+      x: {
+        duration: 0
+      },
+      y: {
+        from: (ctx) => {
+          if (ctx.type === 'data') {
+            return ctx.chart.scales.y.getPixelForValue(0);
+          }
+        },
+        duration: 1500
+      }
+    },
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
+        tooltip: {
+        enabled: false
+      }
       },
 
       scales: {
         x: {
+          title: {
+          display: true,
+          text: 'Minutes',
+          color: '#7878a8',
+          font: {
+            family: "'Sora', sans-serif",
+            size: 12,
+            weight: 'bold'
+          }},
           type: 'linear',
           bounds: 'data',
           ticks: {
@@ -445,17 +471,20 @@ new Chart(
             color: '#7878a8',
             font: {
               family: "'Sora', sans-serif",
-              size: 12
+              size: 12,
+              weight: 'bold'
             }
           }
         },
 
         y: {
+          beginAtZero: true,
           ticks: {
             color: '#7878a8',
             font: {
               family: "'Sora', sans-serif",
-              size: 12
+              size: 12,
+              weight: 'bold',
             }
           },
 
