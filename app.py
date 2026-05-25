@@ -9,7 +9,7 @@ app.secret_key = SECRET_KEY
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
-
+dragon_version = api.get_ddragon_version()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -44,7 +44,7 @@ def match_history():
     except Exception as e:
         return render_template('history.html', error=str(e), history=[], summoner=summoner_name)
 
-    return render_template('history.html', history=history, summoner=summoner_name, error=None)
+    return render_template('history.html', history=history, summoner=summoner_name, error=None,version = dragon_version)
 
 @app.route('/history/load')
 def history_load():
@@ -53,7 +53,7 @@ def history_load():
     page   = int(request.args.get('page', 0))
     per_page = 10
     matches = api.get_match_history(puuid, region, page * per_page, per_page)
-    return render_template("history_rows.html", history=matches)
+    return render_template("history_rows.html", history=matches, version = dragon_version)
 
 @app.route('/select_match/<match_id>')
 def select_match(match_id):
@@ -88,7 +88,8 @@ def analysis_page():
         charts=json.dumps(data['charts']),
         summoner=summoner_name,
         match= match,
-        timeline= timeline)
+        timeline= timeline,
+        version = dragon_version)
 
 @app.route('/search/<summoner_name>/<tagline>')
 def search_summoner(summoner_name, tagline):

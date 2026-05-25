@@ -37,7 +37,7 @@
     var(--red) {{ ((losses / total) * 100) | round | int }}%,
     var(--blue) {{ ((losses / total) * 100) | round | int }}% 100%
   );"><span class="obj" style="position: absolute;top: 20px;right: 27%;z-index: 1;">{{ ((wins / total) * 100) | round | int }}%</span></div>
-    <div style="margin-left: auto;vertical-align: center;">
+    <div style="margin-left: auto;vertical-align: center; font-size: 18px; font-weight: 600;">
       <div>{{ kills }} / {{ deaths }} / {{ assists }}</div>
       <div style="color: {% if kda >= 3 %}var(--win){% elif kda >= 1.5 %}var(--muted){% else %}var(--loss){% endif %};">{{ "%.3g"|format(kda) }}</div>
     </div>
@@ -54,13 +54,9 @@
     <div class="stat-card-value" style="color: var(--loss);">{{ losses }}</div>
     <div class="stat-card-label">Losses</div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-value">{{ ((wins / total) * 100) | round | int }}%</div>
-    <div class="stat-card-label">Win rate</div>
-  </div>
 </div>
 
-<div class="card" style="padding: 1px; overflow: hidden;">
+<div class="card table-wrapper" style="padding: 1px;">
   <table id="history-table">
     <thead>
       <tr>
@@ -89,19 +85,31 @@
 </div>
 {% endif %}
 
-<div id="sentinel" style="height: 20px;"></div>
-<div id="loading-indicator" style="display: none;justify-content: center;"><span class="loading__anim"></span></div>
+<div id="loading-indicator" style="display: none;justify-content: center; margin-top: 12px;"><span class="loading__anim"></span></div>
 <script>
 let page = 2;
 let loading = false;
 let done = false;
-const loadingIndicator = document.getElementById("loading-indicator");
 
+const loadingIndicator = document.getElementById("loading-indicator");
+const wrapper = document.querySelector(".table-wrapper");
+const tbody = document.querySelector("#history-table tbody");
+
+if (!wrapper || !tbody) {
+  console.error("Table wrapper or tbody not found");
+}
+
+// --- Create sentinel row ---
+const sentinel = document.createElement("tr");
+sentinel.id = "scroll-sentinel";
+sentinel.innerHTML = `<td colspan="999"></td>`;
+tbody.appendChild(sentinel);
+
+// --- Load more function ---
 async function loadMore() {
   if (loading || done) return;
-  
-  loading = true;
 
+  loading = true;
   if (loadingIndicator) loadingIndicator.style.display = "flex";
 
   console.log("loading page", page);
@@ -113,26 +121,22 @@ async function loadMore() {
       const text = await res.text();
       console.error("Server error:", text);
       loading = false;
+      if (loadingIndicator) loadingIndicator.style.display = "none";
       return;
     }
 
     const html = await res.text();
-    const tbody = document.querySelector("#history-table tbody");
 
-    if (!tbody) {
-      console.error("tbody not found!");
-      loading = false;
-  if (loadingIndicator) loadingIndicator.style.display = "none";
+    // If no more data
+    if (!html.trim()) {
+      done = true;
+      observer.disconnect();
+      console.log("No more data");
       return;
     }
 
-  
-    tbody.insertAdjacentHTML("beforeend", html);
-
-  
-    if (html.trim().length === 0) {
-      done = true;
-    }
+    // Insert rows BEFORE sentinel
+    sentinel.insertAdjacentHTML("beforebegin", html);
 
     page++;
 
@@ -141,31 +145,27 @@ async function loadMore() {
   }
 
   loading = false;
+  if (loadingIndicator) loadingIndicator.style.display = "none";
 }
 
-
-const sentinel = document.createElement("div");
-sentinel.id = "scroll-sentinel";
-sentinel.style.height = "1px";
-document.body.appendChild(sentinel);
-
-const observer = new IntersectionObserver((entries) => {
-  if (entries[0].isIntersecting) {
-    loadMore();
+// --- IntersectionObserver ---
+const observer = new IntersectionObserver(
+  (entries) => {
+    if (entries[0].isIntersecting) {
+      loadMore();
+    }
+  },
+  {
+    root: wrapper,     // IMPORTANT: scroll container
+    threshold: 1.0
   }
-});
+);
 
-
+// --- Start observing after DOM is ready ---
 window.addEventListener("DOMContentLoaded", () => {
-  const tbody = document.querySelector("#history-table tbody");
-
-  if (!tbody) {
-    console.error("Table not found on DOM load");
-    return;
+  if (sentinel) {
+    observer.observe(sentinel);
   }
-
-  observer.observe(sentinel);
-
 });
 </script>
 

@@ -65,7 +65,7 @@ def get_ddragon_version():
         r = requests.get('https://ddragon.leagueoflegends.com/api/versions.json', timeout=5)
         _DDRAGON_VERSION = r.json()[0]
     except:
-        _DDRAGON_VERSION = '16.7.1'
+        _DDRAGON_VERSION = '16.10.1'
     return _DDRAGON_VERSION
 
 def cache_path(key):

@@ -28,8 +28,7 @@
     --radius-lg: 14px;
   }
 
-  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; min-height: 100vh; }
-
+  body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; min-height: 100vh;}
   nav { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 32px; height: 56px; display: flex; align-items: center; gap: 24px; position: sticky; top: 0; z-index: 100; }
   .nav-logo { font-size: 15px; font-weight: 600; color: var(--text); text-decoration: none; letter-spacing: 0.03em; }
   .nav-logo span { color: var(--blue); }
@@ -54,7 +53,7 @@
     border-radius: 5px;
 
     position: absolute;
-    bottom: 125%; /* position above text */
+    bottom: 125%;
     left: 50%;
     transform: translateX(-50%);
     white-space: nowrap;
@@ -63,7 +62,7 @@
   .tooltip:hover .tooltip-text {
     visibility: visible;
   } 
-  .page { max-width: 1200px; margin: 0 auto; padding: 40px 24px; }
+  .page { max-width: 1200px; margin: 0 auto; padding: 20px 24px; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
 
@@ -76,13 +75,28 @@
   .section-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
 
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); padding: 5px 7px;justify-content: center ;text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  thead th {
+  position: sticky;
+  top: -2px;
+  background: var(--surface);
+  z-index: 1;
+  transform: translateX(-1px);
+}
+  th { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); padding: 5px 7px;justify-content: center ;text-align: left;}
   td { padding: 5px 7px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover td { background: var(--bg4); }
   tr {justify-content: center}
-  tr.is-summoner td { background: rgb(38, 47, 54); }
-  
+  tr.is-summoner td { background: rgb(38, 47, 54);}
+  #history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+  .table-wrapper {
+  height: 580px;
+  overflow-y: auto;
+}
+
   /* ── team header ── */
   .team-headers{display:grid;grid-template-columns:1fr auto 1fr;
               gap:1rem;align-items:center;margin-bottom:1rem}
@@ -303,3 +317,18 @@
                 transform: rotate(1turn)
             }
             }
+
+            /* For WebKit browsers (Chrome, Safari, Edge) */
+.table-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+/* For Firefox */
+.table-wrapper {
+  scrollbar-width: none;
+}
+
+/* For IE/Edge (older versions) */
+.table-wrapper {
+  -ms-overflow-style: none;
+}

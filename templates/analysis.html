@@ -143,7 +143,7 @@
     {% for i in range(7) %}
       {% set item_id = p['item' ~ i] %}
       {% if item_id and item_id != 0 %}
-        <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ item_id }}.png"
+        <img src="https://ddragon.leagueoflegends.com/cdn/{{version}}/img/item/{{ item_id }}.png"
              style="width: 32px; height: 32px; border-radius: 3px;"
              onerror="this.style.display='none'">
       {% else %}
@@ -152,7 +152,7 @@
     {% endfor %}
 
     {% if p.mission %}
-    <img src="https://ddragon.leagueoflegends.com/cdn/16.6.1/img/item/{{ p.mission }}.png"
+    <img src="https://ddragon.leagueoflegends.com/cdn/{{version}}/img/item/{{ p.mission }}.png"
              style="width: 32px; height: 32px; border-radius: 3px;"
              onerror="this.style.display='none'">
     {% else %}

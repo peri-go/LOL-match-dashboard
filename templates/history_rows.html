@@ -17,7 +17,7 @@
         <td><div style="display: grid; grid-template-columns: repeat(4, 24px); grid-template-rows: repeat(2, 24px); gap: 2px;">
             {% for item in m.item %}
               {% if item %}
-                <img src="https://ddragon.leagueoflegends.com/cdn/16.7.1/img/item/{{ item }}.png"
+                <img src="https://ddragon.leagueoflegends.com/cdn/{{version}}/img/item/{{ item }}.png"
                     style="width: 24px; height: 24px; border-radius: 3px;"
                     onerror="this.style.display='none'">
               {% else %}
