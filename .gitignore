@@ -7,6 +7,7 @@ __pycache__/
 # Virtual environment
 venv/
 .env/
+.env
 
 # IDE files
 .vscode/
@@ -16,7 +17,6 @@ venv/
 .DS_Store
 Thumbs.db
 
-#API KEY
-config.py
+# Cache
 cache/
 uploads/

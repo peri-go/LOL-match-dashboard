@@ -2,7 +2,12 @@ import os
 import json
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import api
-from config import SECRET_KEY,SUMMONER,TAG
+from dotenv import load_dotenv
+
+load_dotenv()
+SECRET_KEY = os.getenv("SECRET_KEY")
+SUMMONER = os.getenv("SUMMONER")
+TAG = os.getenv("TAG")
 
 app = Flask(__name__)
 app.secret_key = SECRET_KEY

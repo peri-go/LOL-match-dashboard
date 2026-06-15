@@ -5,7 +5,10 @@ import requests
 import pandas as pd
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from config import API_KEY
+from dotenv import load_dotenv
+
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
 
 CACHE_DIR  = os.path.join(os.path.dirname(__file__), 'cache')
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
