@@ -21,40 +21,12 @@
 
 {% if history %}
 
-{% set filtered = history | selectattr('duration_m', 'ge', 5) | list %}
-{% set wins   = filtered | selectattr('win') | list | length %}
-{% set total  = filtered | length %}
-{% set losses = total - wins %}
-{% set kills = ((filtered | sum(attribute='kills')) / (filtered | length)) | round(1) %}
-{% set deaths = ((filtered | sum(attribute='deaths')) / (filtered | length)) | round(1) %}
-{% set assists = ((filtered | sum(attribute='assists')) / (filtered | length)) | round(1) %}
-{% set kda = (kills + assists) / deaths %}
-<div class="stat-grid" >
-  <div class="stat-card" style="display: flex;">
-    
-    <div class="donut" style="
-  background: conic-gradient(
-    var(--red) {{ ((losses / total) * 100) | round | int }}%,
-    var(--blue) {{ ((losses / total) * 100) | round | int }}% 100%
-  );"><span class="obj" style="position: absolute;top: 20px;right: 27%;z-index: 1;">{{ ((wins / total) * 100) | round | int }}%</span></div>
-    <div style="margin-left: auto;vertical-align: center; font-size: 18px; font-weight: 600;">
-      <div>{{ kills }} / {{ deaths }} / {{ assists }}</div>
-      <div style="color: {% if kda >= 3 %}var(--win){% elif kda >= 1.5 %}var(--muted){% else %}var(--loss){% endif %};">{{ "%.3g"|format(kda) }}</div>
-    </div>
-    <div style="margin-left: auto;vertical-align: center;">
-      <div class="stat-card-value">{{ total }}</div>
-      <div class="stat-card-label">Games</div>
-    </div>
-  </div>
-  <div class="stat-card" style="border-color: rgba(60,184,120,0.3);">
-    <div class="stat-card-value" style="color: var(--win);">{{ wins }}</div>
-    <div class="stat-card-label">Wins</div>
-  </div>
-  <div class="stat-card" style="border-color: rgba(232,64,87,0.3);">
-    <div class="stat-card-value" style="color: var(--loss);">{{ losses }}</div>
-    <div class="stat-card-label">Losses</div>
-  </div>
-</div>
+<!-- JS owns the data -->
+<script>
+  let history = {{ history | tojson }};
+</script>
+
+<div id="stats-container"></div>
 
 <div class="card table-wrapper" style="padding: 1px;">
   <table id="history-table">
@@ -73,6 +45,7 @@
         <th>Patch</th>
       </tr>
     </thead>
+
     <tbody>
       {% include "history_rows.html" %}
     </tbody>
@@ -80,12 +53,16 @@
 </div>
 
 {% else %}
-<div class="card" style="text-align: center; padding: 48px; color: var(--muted);">
+<div class="card" style="text-align:center;padding:48px;color:var(--muted);">
   No matches found.
 </div>
 {% endif %}
 
-<div id="loading-indicator" style="display: none;justify-content: center; margin-top: 12px;"><span class="loading__anim"></span></div>
+<div id="loading-indicator"
+     style="display:none;justify-content:center;margin-top:12px;">
+  <span class="loading__anim"></span>
+</div>
+
 <script>
 let page = 2;
 let loading = false;
@@ -95,48 +72,130 @@ const loadingIndicator = document.getElementById("loading-indicator");
 const wrapper = document.querySelector(".table-wrapper");
 const tbody = document.querySelector("#history-table tbody");
 
-if (!wrapper || !tbody) {
-  console.error("Table wrapper or tbody not found");
-}
-
-// --- Create sentinel row ---
+// ---------------- SENTINEL ----------------
 const sentinel = document.createElement("tr");
 sentinel.id = "scroll-sentinel";
 sentinel.innerHTML = `<td colspan="999"></td>`;
 tbody.appendChild(sentinel);
 
-// --- Load more function ---
+// ---------------- STATS ----------------
+function computeStats(history) {
+  const filtered = history.filter(h => h.duration_m >= 5);
+
+  const total = filtered.length;
+  const wins = filtered.filter(h => h.win).length;
+  const losses = total - wins;
+
+  const sum = (k) => filtered.reduce((a, b) => a + (b[k] || 0), 0);
+
+  const kills = total ? (sum("kills") / total).toFixed(1) : 0;
+  const deaths = total ? (sum("deaths") / total).toFixed(1) : 0;
+  const assists = total ? (sum("assists") / total).toFixed(1) : 0;
+
+  const kda = deaths > 0
+    ? (Number(kills) + Number(assists)) / Number(deaths)
+    : 0;
+
+  return {
+    wins,
+    losses,
+    total,
+    kills,
+    deaths,
+    assists,
+    kda,
+    winPct: total ? Math.round((wins / total) * 100) : 0
+  };
+}
+
+// ---------------- RENDER STATS ----------------
+function renderStats(s) {
+  const lossPct = s.total ? (s.losses / s.total) * 100 : 0;
+
+  const kdaColor =
+    s.kda >= 3 ? "var(--win)" :
+    s.kda >= 1.5 ? "var(--muted)" :
+    "var(--loss)";
+
+  return `
+  <div class="stat-grid">
+
+    <div class="stat-card" style="display:flex;">
+
+      <div class="donut"
+        style="background:conic-gradient(var(--red) ${lossPct}%, var(--blue) 0)">
+        <span class="obj" style="position: absolute;top: 20px;right: 27%;z-index: 1;">${s.winPct}%</span>
+      </div>
+
+      <div style="margin-left:auto;font-size:18px;font-weight:600">
+        <div>${s.kills} / ${s.deaths} / ${s.assists}</div>
+        <div style="color:${kdaColor}">
+          ${s.kda.toFixed(3)}
+        </div>
+      </div>
+
+      <div style="margin-left:auto">
+        <div class="stat-card-value">${s.total}</div>
+        <div class="stat-card-label">Games</div>
+      </div>
+
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-value" style="color:var(--win)">${s.wins}</div>
+      <div class="stat-card-label">Wins</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-value" style="color:var(--loss)">${s.losses}</div>
+      <div class="stat-card-label">Losses</div>
+    </div>
+
+  </div>`;
+}
+
+// ---------------- UPDATE UI ----------------
+function updateStats() {
+  const stats = computeStats(history);
+  const container = document.getElementById("stats-container");
+
+  if (container) {
+    container.innerHTML = renderStats(stats);
+  }
+}
+
+// ---------------- LOAD MORE ----------------
 async function loadMore() {
   if (loading || done) return;
 
   loading = true;
-  if (loadingIndicator) loadingIndicator.style.display = "flex";
-
-  console.log("loading page", page);
+  loadingIndicator.style.display = "flex";
 
   try {
     const res = await fetch(`/history/load?page=${page}`);
 
     if (!res.ok) {
-      const text = await res.text();
-      console.error("Server error:", text);
-      loading = false;
-      if (loadingIndicator) loadingIndicator.style.display = "none";
+      console.error(await res.text());
       return;
     }
 
-    const html = await res.text();
+    const data = await res.json();
+    // expected: { html: "...", history: [...] }
 
-    // If no more data
-    if (!html.trim()) {
+    if (!data.history || data.history.length === 0) {
       done = true;
       observer.disconnect();
-      console.log("No more data");
       return;
     }
 
-    // Insert rows BEFORE sentinel
-    sentinel.insertAdjacentHTML("beforebegin", html);
+    // append rows
+    sentinel.insertAdjacentHTML("beforebegin", data.html);
+
+    // update state
+    history.push(...data.history);
+
+    // update stats
+    updateStats();
 
     page++;
 
@@ -145,27 +204,21 @@ async function loadMore() {
   }
 
   loading = false;
-  if (loadingIndicator) loadingIndicator.style.display = "none";
+  loadingIndicator.style.display = "none";
 }
 
-// --- IntersectionObserver ---
+// ---------------- OBSERVER ----------------
 const observer = new IntersectionObserver(
   (entries) => {
-    if (entries[0].isIntersecting) {
-      loadMore();
-    }
+    if (entries[0].isIntersecting) loadMore();
   },
-  {
-    root: wrapper,     // IMPORTANT: scroll container
-    threshold: 1.0
-  }
+  { root: wrapper, threshold: 1.0 }
 );
 
-// --- Start observing after DOM is ready ---
+// ---------------- INIT ----------------
 window.addEventListener("DOMContentLoaded", () => {
-  if (sentinel) {
-    observer.observe(sentinel);
-  }
+  updateStats();
+  observer.observe(sentinel);
 });
 </script>
 

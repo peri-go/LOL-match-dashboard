@@ -26,6 +26,7 @@
   <button class="tab-btn" onclick="switchTab('builds', this)">Builds</button>
   <button class="tab-btn" onclick="switchTab('skills', this)">Skills</button>
   <button class="tab-btn" onclick="switchTab('timeline', this)">Gold Diff</button>
+  <button class="tab-btn" onclick="switchTab('map', this)">Kill Map</button>
 </div>
 
 <!-- ── SCOREBOARD ─────────────────────────────────────────────────────────── -->
@@ -206,7 +207,7 @@
           <img src="{{event.item_url}}"
              style="width: 32px; height: 32px; border-radius: 3px;"
              title="{{event.item_name}}" onerror="this.style.display='none'">
-             <span class="i-time">{{"{:,.2f}".format(event.timestamp_min)}}</span>
+             <span class="i-time">{{event.timestamp}}</span>
              {% if event.type=='ITEM_SOLD'%}<span class="badge-sold">SOLD</span>{% endif %}
              <div class="triangle"></div></div>
             
@@ -254,6 +255,14 @@
     {% endfor %}
     {% endfor %}
 </div>
+<!-- KILLMAP -->
+ <div id="tab-map" class="tab-panel">
+    <div class="card" style="margin-bottom: 20px;width: 60%;aspect-ratio: 1 / 1;padding: 0px;">
+        <canvas id="killMap" style="width: 100%,, border-radius: 12px;
+    height: 100%;" ></canvas>
+</div>
+    </div>
+ </div>
 
 
 
@@ -286,13 +295,13 @@
       datasets: [{ data: data.values, backgroundColor: teamColors(data.teams, data.labels), borderRadius: 4, borderSkipped: false }]
       },
       options: {
-        indexAxis: 'y', responsive: true,
+        indexAxis: 'y', responsive: false,
         plugins: {
           legend: { display: false },
           tooltip: { backgroundColor: '#1c1c2e', borderColor: '#2e2e48', borderWidth: 1, titleColor: '#e2e2f0', bodyColor: '#7878a8', padding: 10 }
         },
         scales: {
-          x: { beginAtZero: true, grid: { color: 'rgba(46,46,72,0.6)' }, ticks: { color: '#7878a8', font: { family: "'Sora', sans-serif", size: 12 } } },
+          x: { grid: { color: 'rgba(46,46,72,0.6)' }, ticks: { color: '#7878a8', font: { family: "'Sora', sans-serif", size: 12 } } },
           y: { grid: { display: false }, ticks: { color: '#e2e2f0', font: { family: "'Sora', sans-serif", size: 12 } } }
         }
       }
@@ -324,7 +333,6 @@ const points = goldValues.map(o => {
   return { x: parseFloat(k), y: o[k] };
 });
 
-// build final continuous dataset (no nulls)
 const segments = [];
 
 for (let i = 0; i < points.length - 1; i++) {
@@ -412,7 +420,7 @@ new Chart(
                 : '#e84057';
             },
 
-            // fill color per segment (FIXED)
+            // fill color per segment
             backgroundColor: ctx => {
               const y1 = ctx.p0.parsed.y;
               const y2 = ctx.p1.parsed.y;
@@ -452,7 +460,6 @@ new Chart(
         enabled: false
       }
       },
-
       scales: {
         x: {
           title: {
@@ -498,6 +505,183 @@ new Chart(
     plugins: [zeroLinePlugin]
   }
 );
+
+
+const events = {{ timeline | tojson }};
+const scoreboard = {{ scoreboard | tojson }};
+const SIZE = 1500;
+
+// Map bounds
+const MAP = {
+  minX: -120, maxX: 14870,
+  minY: -120, maxY: 14980
+};
+
+// ─── Champion lookup ─────────────────────────────
+const championMap = Object.fromEntries(
+  [...scoreboard.blue, ...scoreboard.red]
+    .map(p => [p.participant_id, p.champion_name])
+);
+
+const teamMap = Object.fromEntries([
+  ...scoreboard.blue.map(p => [p.participant_id, "BLUE"]),
+  ...scoreboard.red.map(p => [p.participant_id, "RED"])
+]);
+
+// ─── Canvas setup ────────────────────────────────
+const maskCanvas = document.createElement("canvas");
+const maskCtx = maskCanvas.getContext("2d");
+
+const maskImage = new Image();
+const bgImage = new Image();
+
+maskImage.src = "{{ url_for('static', filename='assets/mask.png') }}";
+bgImage.src   = "{{ url_for('static', filename='assets/shade.png') }}";
+
+// ─── Load helper ─────────────────────────────────
+const load = img =>
+  img.complete
+    ? Promise.resolve()
+    : new Promise(r => (img.onload = img.onerror = r));
+
+// ─── Run after images load ───────────────────────
+Promise.all([load(maskImage), load(bgImage)]).then(() => {
+
+  // Cache mask pixels
+  const maskW = (maskCanvas.width = maskImage.naturalWidth);
+  const maskH = (maskCanvas.height = maskImage.naturalHeight);
+
+  maskCtx.drawImage(maskImage, 0, 0);
+  const mask = maskCtx.getImageData(0, 0, maskW, maskH).data;
+
+  const isWalkable = (x, y) => {
+    const mx = Math.round(x * maskW / SIZE);
+    const my = Math.round((SIZE - y) * maskH / SIZE);
+
+    if (mx < 0 || my < 0 || mx >= maskW || my >= maskH) return false;
+    return mask[(my * maskW + mx) * 4] > 128;
+  };
+
+  const circleOk = (x, y, r) =>
+    Array.from({ length: 8 }).every((_, i) => {
+      const a = (i * 45) * Math.PI / 180;
+      return isWalkable(x + Math.cos(a) * r, y + Math.sin(a) * r);
+    });
+
+  const snap = (x, y, r = 5) => {
+    if (circleOk(x, y, r)) return { x, y };
+
+    const stepX = SIZE / maskW;
+    const stepY = SIZE / maskH;
+    const max = Math.max(maskW, maskH);
+
+    for (let d = 1; d <= max; d++) {
+      let best = null, bestDist = Infinity;
+
+      for (let dx = -d; dx <= d; dx++) {
+        for (let dy = -d; dy <= d; dy++) {
+          if (Math.abs(dx) !== d && Math.abs(dy) !== d) continue;
+
+          const nx = x + dx * stepX;
+          const ny = y + dy * stepY;
+          const dist = dx * dx + dy * dy;
+
+          if (circleOk(nx, ny, r) && dist < bestDist) {
+            best = { x: nx, y: ny };
+            bestDist = dist;
+          }
+        }
+      }
+
+      if (best) return best;
+    }
+
+    return { x, y };
+  };
+
+  const POINT_RADIUS = 5; 
+
+  const coordinates = events
+    .filter(e => e.type === "CHAMPION_KILL" && e.position_x && e.position_y)
+    .map(e => {
+      const x = (e.position_x - MAP.minX) / (MAP.maxX - MAP.minX) * SIZE;
+      const y = (e.position_y - MAP.minY) / (MAP.maxY - MAP.minY) * SIZE;
+
+      const snapped = snap(x, y, POINT_RADIUS);
+
+      return {
+        x: snapped.x,
+        y: snapped.y,
+        killer: championMap[e.killer_id],
+        victim: championMap[e.victim_id],
+        team: teamMap[e.victim_id],
+        time: e.timestamp
+      };
+    });
+
+  const bgPlugin = {
+    id: "bg",
+    beforeDraw(chart) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea || !bgImage.complete) return;
+
+      ctx.drawImage(
+        bgImage,
+        chartArea.left,
+        chartArea.top,
+        chartArea.width,
+        chartArea.height
+      );
+    }
+  };
+
+  new Chart(document.getElementById("killMap"), {
+    type: "scatter",
+    data: {
+      datasets: [{
+        data: coordinates,
+        pointRadius: POINT_RADIUS,
+        pointHoverRadius: 7,
+        pointBackgroundColor: (ctx) => {
+          const team = ctx.raw.team;
+
+          if (team === "BLUE") return "#eb5757";
+          if (team === "RED") return "#2f80ed";
+
+          return "#999";
+        },
+        borderColor: (ctx) => {
+          const team = ctx.raw.team;
+
+          if (team === "BLUE") return "#d24646";
+          if (team === "RED") return "#2672d9";
+
+          return "#999";
+        },
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ({ raw }) =>
+              [`Killer: ${raw.killer}`, `Victim: ${raw.victim}`, `Time: ${raw.time}`]
+          }
+        }
+      },
+      scales: {
+        x: { min: 0, max: SIZE, display: false },
+        y: { min: 0, max: SIZE, display: false }
+      }
+    },
+    plugins: [bgPlugin]
+  });
+});
 
 </script>
 {% endblock %}

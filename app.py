@@ -10,7 +10,7 @@ UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 REGIONS = ["BR","EUW","EUNE","KR","NA","LAN","LAS","OCE","RU","TR","JP"]
 dragon_version = api.get_ddragon_version()
-
+ 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     error = None
@@ -53,7 +53,11 @@ def history_load():
     page   = int(request.args.get('page', 0))
     per_page = 10
     matches = api.get_match_history(puuid, region, page * per_page, per_page)
-    return render_template("history_rows.html", history=matches, version = dragon_version)
+    html = render_template("history_rows.html", history=matches, version=dragon_version)
+    return jsonify({
+        "history": matches,
+        "html": html
+    })
 
 @app.route('/select_match/<match_id>')
 def select_match(match_id):

@@ -489,27 +489,34 @@ def build_timeline(match_id, region=None):
 
     events = []
     for frame in tl['info']['frames']:
-        timestamp_min = frame['timestamp'] // 60000
+        timestamp = f"{frame['timestamp'] // 60000} min"
         for event in frame['events']:
             e_type = event.get('type', '')
             item_id = str(event.get('itemId'))
-            if e_type not in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL', 'ITEM_PURCHASED', 'ITEM_SOLD') or item_id not in items:
-                continue
-            events.append({
-                'timestamp_min': timestamp_min,
-                'timestamp_ms':  event.get('timestamp'),
-                'type':          e_type,
-                'killer_id':     str(event.get('killerId') or event.get('creatorId') or event.get('participantId')),
-                'victim_id':     str(event.get('victimId')),
-                'assisting_ids': str(event.get('assistingParticipantIds', [])),
-                'item_id':       item_id,
-                'item_url':      item_url(item_id),
-                'item_name':     items[item_id],
-                'building_type': event.get('buildingType'),
-                'monster_type':  event.get('monsterType'),
-                'position_x':    event.get('position', {}).get('x'),
-                'position_y':    event.get('position', {}).get('y'),
-            })
+            if e_type in ('CHAMPION_KILL', 'BUILDING_KILL', 'ELITE_MONSTER_KILL'): 
+                events.append({
+                    'timestamp': timestamp,  
+                    'timestamp_ms':  event.get('timestamp'),
+                    'type':          e_type,
+                    'killer_id':     str(event.get('killerId') or event.get('creatorId') or event.get('participantId')),
+                    'victim_id':     str(event.get('victimId')),
+                    'assisting_ids': str(event.get('assistingParticipantIds', [])),
+                    'building_type': event.get('buildingType'),
+                    'monster_type':  event.get('monsterType'),
+                    'position_x':    event.get('position', {}).get('x'),
+                    'position_y':    event.get('position', {}).get('y'),
+                })
+            elif e_type in ('ITEM_PURCHASED', 'ITEM_SOLD') and item_id in items:
+                events.append({
+                    'timestamp':     timestamp,
+                    'timestamp_ms':  event.get('timestamp'),
+                    'type':          e_type,
+                    'killer_id':     str(event.get('killerId') or event.get('creatorId') or event.get('participantId')),
+                    'item_id':       item_id,
+                    'item_url':      item_url(item_id),
+                    'item_name':     items[item_id],
+                })
+    
     return events
 
 def build_skill_timeline(match_id, region=None):
